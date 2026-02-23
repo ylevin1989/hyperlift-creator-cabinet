@@ -20,9 +20,9 @@ const NAV_ITEMS = [
 ];
 
 export const MainLayout = ({ children }: { children: ReactNode }) => {
-    const isMobile = useGlobalStore((s) => s.isMobile);
+    const storeIsMobile = useGlobalStore((s) => s.isMobile);
     const setIsMobile = useGlobalStore((s) => s.setIsMobile);
-    const userId = useGlobalStore((s) => s.userId);
+    const storeUserId = useGlobalStore((s) => s.userId);
     const router = useRouter();
     const pathname = usePathname();
     const [mounted, setMounted] = useState(false);
@@ -35,21 +35,25 @@ export const MainLayout = ({ children }: { children: ReactNode }) => {
         return () => window.removeEventListener('resize', handleResize);
     }, [setIsMobile]);
 
-    if (!mounted) {
-        return <div className="min-h-screen bg-neutral-950 w-full" />;
-    }
+    // To prevent hydration mismatch, the first client render MUST match the server render exactly.
+    // The server has no access to localStorage, so userId is null and isMobile is false.
+    const userId = mounted ? storeUserId : null;
+    const isMobile = mounted ? storeIsMobile : false;
 
     useEffect(() => {
-        if (!userId && pathname !== '/login') {
+        if (mounted && !storeUserId && pathname !== '/login') {
             router.push('/login');
         }
-    }, [userId, pathname, router]);
+    }, [mounted, storeUserId, pathname, router]);
 
     if (pathname === '/login') {
         return <main>{children}</main>;
     }
 
-    if (!userId) return null;
+    if (!userId) {
+        // We match what the server renders before authentication is confirmed.
+        return <main className="min-h-screen bg-neutral-950">{mounted ? null : children}</main>;
+    }
 
     return (
         <div className="flex bg-neutral-950 text-white min-h-screen font-sans">
