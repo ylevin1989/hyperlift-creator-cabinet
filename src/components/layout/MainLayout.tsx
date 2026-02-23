@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useGlobalStore } from '@/store/global';
 import { Home, BriefcaseBusiness, ListTodo, BarChart3, Wallet, User } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -25,13 +25,19 @@ export const MainLayout = ({ children }: { children: ReactNode }) => {
     const userId = useGlobalStore((s) => s.userId);
     const router = useRouter();
     const pathname = usePathname();
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
+        setMounted(true);
         const handleResize = () => setIsMobile(window.innerWidth < 768);
         handleResize();
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, [setIsMobile]);
+
+    if (!mounted) {
+        return <div className="min-h-screen bg-neutral-950 w-full" />;
+    }
 
     useEffect(() => {
         if (!userId && pathname !== '/login') {
