@@ -2,57 +2,69 @@
 
 import { ReactNode, useEffect, useState } from 'react';
 import { useGlobalStore } from '@/store/global';
-import { Home, BriefcaseBusiness, ListTodo, BarChart3, Wallet, User } from 'lucide-react';
+import { Home, BriefcaseBusiness, ListTodo, BarChart3, Wallet, User, BookOpen, ShieldAlert } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Flexbox } from '@lobehub/ui';
 import clsx from 'clsx';
-// For Lucide-react components, we'll try to import icons properly.
-import * as LucideIcons from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const NAV_ITEMS = [
-    { key: 'dashboard', label: 'Сводка', icon: LucideIcons.Home, path: '/dashboard' },
-    { key: 'briefs', label: 'Кастинг', icon: LucideIcons.BriefcaseBusiness, path: '/briefs' },
-    { key: 'projects', label: 'Проекты', icon: LucideIcons.ListTodo, path: '/projects' },
-    { key: 'stats', label: 'Статистика', icon: LucideIcons.BarChart3, path: '/stats' },
-    { key: 'finances', label: 'Финансы', icon: LucideIcons.Wallet, path: '/finances' },
-    { key: 'profile', label: 'Профиль', icon: LucideIcons.User, path: '/profile' },
-    { key: 'training', label: 'Обучение', icon: LucideIcons.BookOpen, path: '/training' },
+    { key: 'dashboard', label: 'Сводка', icon: Home, path: '/dashboard' },
+    { key: 'briefs', label: 'Кастинг', icon: BriefcaseBusiness, path: '/briefs' },
+    { key: 'projects', label: 'Проекты', icon: ListTodo, path: '/projects' },
+    { key: 'stats', label: 'Статистика', icon: BarChart3, path: '/stats' },
+    { key: 'finances', label: 'Финансы', icon: Wallet, path: '/finances' },
+    { key: 'profile', label: 'Профиль', icon: User, path: '/profile' },
+    { key: 'training', label: 'Обучение', icon: BookOpen, path: '/training' },
+    { key: 'admin', label: 'Админка', icon: ShieldAlert, path: '/admin', adminOnly: true },
 ];
 
 export const MainLayout = ({ children }: { children: ReactNode }) => {
     const storeIsMobile = useGlobalStore((s) => s.isMobile);
     const setIsMobile = useGlobalStore((s) => s.setIsMobile);
     const storeUserId = useGlobalStore((s) => s.userId);
+    const hasHydrated = useGlobalStore((s) => s._hasHydrated);
     const router = useRouter();
     const pathname = usePathname();
     const [mounted, setMounted] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
         setMounted(true);
-        const handleResize = () => setIsMobile(window.innerWidth < 768);
-        handleResize();
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
     }, [setIsMobile]);
 
     // To prevent hydration mismatch, the first client render MUST match the server render exactly.
     // The server has no access to localStorage, so userId is null and isMobile is false.
-    const userId = mounted ? storeUserId : null;
+    const userId = mounted && hasHydrated ? storeUserId : null;
     const isMobile = mounted ? storeIsMobile : false;
 
     useEffect(() => {
-        if (mounted && !storeUserId && pathname !== '/login') {
-            router.push('/login');
-        }
-    }, [mounted, storeUserId, pathname, router]);
+        if (!hasHydrated) return;
 
-    if (pathname === '/login') {
+        if (!storeUserId && pathname !== '/login' && pathname !== '/register') {
+            router.push('/login');
+        } else if (storeUserId) {
+            const checkAdmin = async () => {
+                const { data } = await supabase.from('cr_creators').select('role').eq('id', storeUserId).single();
+                if (data && data.role === 'admin') {
+                    setIsAdmin(true);
+                }
+            };
+            checkAdmin();
+        }
+    }, [hasHydrated, storeUserId, pathname, router]);
+
+    if (pathname === '/login' || pathname === '/register') {
         return <main>{children}</main>;
     }
 
-    if (!userId) {
+    if (!userId && pathname !== '/register') {
         // We match what the server renders before authentication is confirmed.
-        return <main className="min-h-screen bg-neutral-950">{mounted ? null : children}</main>;
+        return <main className="min-h-screen bg-neutral-950">{!mounted ? children : null}</main>;
     }
 
     return (
@@ -63,7 +75,7 @@ export const MainLayout = ({ children }: { children: ReactNode }) => {
                     <div className="font-bold text-2xl mb-8 tracking-tighter text-blue-500 p-2">
                         HYPER<span className="text-white">LIFT</span>
                     </div>
-                    {NAV_ITEMS.map((item) => {
+                    {NAV_ITEMS.filter(item => !item.adminOnly || isAdmin).map((item) => {
                         const Icon = item.icon;
                         const isActive = pathname.startsWith(item.path);
                         return (
@@ -102,7 +114,7 @@ export const MainLayout = ({ children }: { children: ReactNode }) => {
             {/* Bottom TabBar for Mobile */}
             {isMobile && (
                 <nav className="fixed bottom-0 w-full h-20 border-t border-neutral-800 bg-neutral-900/80 backdrop-blur-2xl px-2 pb-safe flex justify-around items-center z-50">
-                    {NAV_ITEMS.map((item) => {
+                    {NAV_ITEMS.filter(item => !item.adminOnly || isAdmin).map((item) => {
                         const Icon = item.icon;
                         const isActive = pathname.startsWith(item.path);
                         return (
