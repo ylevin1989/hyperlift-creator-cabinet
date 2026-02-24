@@ -27,9 +27,9 @@ export async function GET(request: Request) {
             .from('cr_video_assets')
             .select(`
                 id, title, video_url, views, likes, comments, 
-                kpi_bonus, created_at, last_stats_update, status,
+                kpi_bonus, created_at, last_stats_update, status, thumbnail_url,
                 project:cr_projects(title, brief:cr_briefs(title)),
-                creator:cr_creators(full_name, username, social_links)
+                creator:cr_creators(full_name, username, social_links, avatar_url)
             `)
             .order('created_at', { ascending: false });
 

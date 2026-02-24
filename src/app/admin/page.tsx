@@ -28,9 +28,15 @@ interface Asset {
     status: string;
     created_at: string;
     last_stats_update: string | null;
+    thumbnail_url?: string;
     project?: { title?: string; brief?: { title?: string } };
-    creator?: { full_name?: string; username?: string };
+    creator?: { full_name?: string; username?: string; avatar_url?: string };
 }
+
+const getYouTubeThumbnail = (url: string) => {
+    const match = url.match(/[?&]v=([A-Za-z0-9_-]{11})/) || url.match(/youtu\.be\/([A-Za-z0-9_-]{11})/);
+    return match ? `https://i.ytimg.com/vi/${match[1]}/hqdefault.jpg` : '';
+};
 
 export default function AdminPage() {
     const userId = useGlobalStore((s) => s.userId);
@@ -145,8 +151,12 @@ export default function AdminPage() {
                             {/* Row 1: Creator + Status + Platform */}
                             <div className="flex items-center justify-between gap-3 flex-wrap">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 rounded-full bg-neutral-800 flex items-center justify-center font-bold text-xs text-white uppercase">
-                                        {asset.creator?.full_name?.charAt(0) || '?'}
+                                    <div className="w-9 h-9 rounded-full bg-neutral-800 flex items-center justify-center font-bold text-xs text-white uppercase overflow-hidden shrink-0">
+                                        {asset.creator?.avatar_url ? (
+                                            <img src={asset.creator.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                                        ) : (
+                                            asset.creator?.full_name?.charAt(0) || '?'
+                                        )}
                                     </div>
                                     <div>
                                         <div className="font-bold text-white text-sm">{asset.creator?.full_name || asset.creator?.username || '—'}</div>
@@ -162,14 +172,31 @@ export default function AdminPage() {
                             </div>
 
                             {/* Row 2: Video URL + Title */}
-                            <div>
-                                <div className="font-medium text-white text-sm mb-0.5 truncate max-w-full" title={asset.title || ''}>
-                                    {asset.title || 'Без названия'}
+                            <div className="flex gap-4 items-center">
+                                {/* Thumbnail */}
+                                <div className="shrink-0 w-[120px] aspect-video bg-neutral-950 rounded-lg overflow-hidden relative flex items-center justify-center border border-neutral-800">
+                                    {asset.thumbnail_url || (asset.video_url && asset.video_url.includes('youtu') && getYouTubeThumbnail(asset.video_url)) ? (
+                                        <img
+                                            src={asset.thumbnail_url || getYouTubeThumbnail(asset.video_url)}
+                                            alt={asset.title}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="text-neutral-700">
+                                            <Eye size={20} />
+                                        </div>
+                                    )}
                                 </div>
-                                <a href={asset.video_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-xs truncate max-w-full flex items-center gap-1">
-                                    <ExternalLink size={10} className="shrink-0" />
-                                    <span className="truncate">{asset.video_url.replace(/^https?:\/\/(www\.)?/, '')}</span>
-                                </a>
+                                {/* Title and URL */}
+                                <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-white text-sm mb-1 line-clamp-2" title={asset.title || ''}>
+                                        {asset.title || 'Без названия'}
+                                    </div>
+                                    <a href={asset.video_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-xs truncate max-w-full flex items-center gap-1">
+                                        <ExternalLink size={10} className="shrink-0" />
+                                        <span className="truncate">{asset.video_url.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                                    </a>
+                                </div>
                             </div>
 
                             {/* Row 3: Metrics */}
