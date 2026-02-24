@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { parseVideoMetrics } from '@/lib/parse-video';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -25,9 +26,9 @@ export async function GET(request: Request) {
         const { data: assets, error: assetsErr } = await supabase
             .from('cr_video_assets')
             .select(`
-                id, video_url, views, likes, comments, 
+                id, title, video_url, views, likes, comments, 
                 kpi_bonus, created_at, last_stats_update, status,
-                project:cr_projects(brief:cr_briefs(title)),
+                project:cr_projects(title, brief:cr_briefs(title)),
                 creator:cr_creators(full_name, username, social_links)
             `)
             .order('created_at', { ascending: false });
@@ -73,69 +74,37 @@ export async function POST(request: Request) {
         } else if (action === 'reject') {
             const { error } = await supabase.from('cr_video_assets').update({ status: 'rejected' }).eq('id', assetId);
             if (error) throw error;
+        } else if (action === 'update_metrics') {
+            // Manual metrics update by admin
+            const { views, likes, comments: commentCount } = body;
+            const { error: updateErr } = await supabase.from('cr_video_assets').update({
+                views: views ?? 0,
+                likes: likes ?? 0,
+                comments: commentCount ?? 0,
+                last_stats_update: new Date().toISOString()
+            }).eq('id', assetId);
+            if (updateErr) throw updateErr;
+            return NextResponse.json({ success: true });
         } else if (action === 'sync') {
             const { data: asset, error: getErr } = await supabase.from('cr_video_assets').select('video_url').eq('id', assetId).single();
             if (getErr || !asset?.video_url) throw getErr || new Error("Asset not found");
 
-            const url = asset.video_url;
-            let views = 0;
-            let likes = 0;
-            let comments = 0;
+            const metrics = await parseVideoMetrics(asset.video_url);
 
-            try {
-                const fetchRes = await fetch(url, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                    }
-                });
-                const html = await fetchRes.text();
-
-                if (url.includes('tiktok.com')) {
-                    const playMatch = html.match(/"playCount":(\d+)/) || html.match(/"play_count":(\d+)/);
-                    const diggMatch = html.match(/"diggCount":(\d+)/) || html.match(/"digg_count":(\d+)/);
-                    const commentMatch = html.match(/"commentCount":(\d+)/) || html.match(/"comment_count":(\d+)/);
-
-                    if (playMatch) views = parseInt(playMatch[1], 10);
-                    if (diggMatch) likes = parseInt(diggMatch[1], 10);
-                    if (commentMatch) comments = parseInt(commentMatch[1], 10);
-                } else if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                    const viewMatch = html.match(/"viewCount":"?(\d+)"?/) || html.match(/(\d+)\s+views/);
-                    let likeMatch = html.match(/"likeCount":"?(\d+)"?/);
-                    if (!likeMatch) {
-                        const m = html.match(/"defaultText":\{"accessibility":\{"accessibilityData":\{"label":"(.*?) likes"/);
-                        if (m) likeMatch = m;
-                    }
-
-                    let commentMatch = html.match(/"commentCount":\s*\{"accessibility":\{"accessibilityData":\{"label":"([^\d]*)?([\d,]+)/);
-                    if (!commentMatch) {
-                        commentMatch = html.match(/([\d,]+)\s+comments/i);
-                    }
-
-                    if (viewMatch) views = parseInt(viewMatch[1].replace(/\D/g, ''), 10);
-                    if (likeMatch) likes = parseInt(likeMatch[1].replace(/\D/g, ''), 10);
-                    if (commentMatch && commentMatch[commentMatch.length - 1]) {
-                        comments = parseInt(commentMatch[commentMatch.length - 1].replace(/\D/g, ''), 10);
-                    }
-                }
-            } catch (e) {
-                console.error("Scrape error:", e);
-            }
-
-            if (views > 0 || likes > 0 || comments > 0) {
+            if (metrics.views > 0 || metrics.likes > 0 || metrics.comments > 0 || metrics.title) {
                 const { error: updateErr } = await supabase.from('cr_video_assets').update({
-                    views,
-                    likes,
-                    comments,
+                    title: metrics.title || 'Без названия',
+                    views: metrics.views,
+                    likes: metrics.likes,
+                    comments: metrics.comments,
                     last_stats_update: new Date().toISOString()
                 }).eq('id', assetId);
                 if (updateErr) throw updateErr;
             } else {
-                return NextResponse.json({ error: 'Не удалось получить метрики' }, { status: 400 });
+                return NextResponse.json({ error: 'Не удалось получить метрики. Попробуйте ввести вручную.' }, { status: 400 });
             }
 
-            return NextResponse.json({ success: true, views, likes, comments });
+            return NextResponse.json({ success: true, ...metrics });
         }
 
         return NextResponse.json({ success: true });

@@ -1,0 +1,22 @@
+services:
+  app:
+    build: .
+    container_name: creator-cabinet
+    restart: always
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - .env.local
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.creator.rule=Host(`creator.hyperlift.ru`)"
+      - "traefik.http.routers.creator.entrypoints=websecure"
+      - "traefik.http.routers.creator.tls=true"
+      - "traefik.http.routers.creator.tls.certresolver=mytlschallenge"
+      - "traefik.http.services.creator.loadbalancer.server.port=3000"
+    networks:
+      - traefik_network
+
+networks:
+  traefik_network:
+    external: true

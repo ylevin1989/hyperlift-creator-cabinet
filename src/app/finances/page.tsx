@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import {
     Wallet,
     ArrowUpRight,
@@ -11,15 +12,54 @@ import {
     CheckCircle2
 } from 'lucide-react';
 import clsx from 'clsx';
+import { useGlobalStore } from '@/store/global';
 
-const TRANSACTIONS = [
-    { id: 'TRX-9982', project: 'Polaroid Now', type: 'holidng', amount: '15 000 ₽', date: 'Сегодня, 14:30', status: 'Холдирование' },
-    { id: 'TRX-9981', project: 'Вывод на карту', type: 'withdraw', amount: '-45 000 ₽', date: '12 Апр, 10:15', status: 'Исполнено' },
-    { id: 'TRX-9980', project: 'Обзор мыши TechGear', type: 'income', amount: '10 000 ₽', date: '10 Апр, 18:20', status: 'Зачислено' },
-    { id: 'TRX-9979', project: 'Скетч FitApp', type: 'income', amount: '12 000 ₽', date: '05 Апр, 09:00', status: 'Зачислено' },
-];
+interface Transaction {
+    id: string;
+    project: string;
+    type: 'income' | 'withdraw' | 'holding' | string;
+    amount: string;
+    date: string;
+    status: string;
+}
+
+interface FinancesData {
+    profile: {
+        available_balance: number;
+        holding_balance: number;
+    };
+    transactions: Transaction[];
+}
 
 export default function FinancesPage() {
+    const userId = useGlobalStore((s) => s.userId);
+    const [data, setData] = useState<FinancesData | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!userId) return;
+        const fetchFinances = async () => {
+            try {
+                const res = await fetch(`/api/finances?userId=${userId}`);
+                const json = await res.json();
+                if (res.ok) setData(json);
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchFinances();
+    }, [userId]);
+
+    if (loading) {
+        return <div className="p-8 text-neutral-400 animate-pulse text-center">Загрузка финансов...</div>;
+    }
+
+    if (!data) {
+        return <div className="p-8 text-red-400 text-center">Ошибка загрузки финансов</div>;
+    }
+
     return (
         <div className="flex flex-col gap-6 animate-fade-in pb-8">
 
@@ -41,8 +81,8 @@ export default function FinancesPage() {
                     <h3 className="text-blue-200 font-medium flex items-center gap-2">
                         Доступно к выводу <CheckCircle2 size={16} />
                     </h3>
-                    <p className="text-4xl font-black text-white mt-2 mb-6">45 200 ₽</p>
-                    <button className="bg-white text-black font-bold py-3 px-6 rounded-xl hover:bg-neutral-200 transition-colors shadow-lg">
+                    <p className="text-4xl font-black text-white mt-2 mb-6">{data.profile.available_balance} ₽</p>
+                    <button className="bg-white text-black font-bold py-3 px-6 rounded-xl hover:bg-neutral-200 transition-colors shadow-lg relative z-10">
                         Вывести средства
                     </button>
                 </div>
@@ -53,11 +93,11 @@ export default function FinancesPage() {
                         <h3 className="text-neutral-400 font-medium flex items-center gap-2">
                             Холдирование <Lock size={16} className="text-neutral-500" />
                         </h3>
-                        <p className="text-3xl font-black text-white mt-2">15 000 ₽</p>
-                        <p className="text-sm text-neutral-500 mt-2">Средства заморожены до окончания срока гарантии проекта "Polaroid Now". Ожидаемая дата разморозки: 25 Апреля.</p>
+                        <p className="text-3xl font-black text-white mt-2">{data.profile.holding_balance} ₽</p>
+                        <p className="text-sm text-neutral-500 mt-2">Средства заморожены до окончания срока гарантии по активным проектам. Они будут зачислены после успешной проверки модератором.</p>
                     </div>
                     <div className="mt-4 flex gap-2">
-                        <span className="text-xs bg-neutral-800 text-neutral-400 px-3 py-1.5 rounded-lg border border-neutral-700">1 проект на гарантии</span>
+                        <span className="text-xs bg-neutral-800 text-neutral-400 px-3 py-1.5 rounded-lg border border-neutral-700">Проектов на холде: {data.transactions.filter(t => t.status === 'Холдирование').length}</span>
                     </div>
                 </div>
             </div>
@@ -80,8 +120,10 @@ export default function FinancesPage() {
             <div>
                 <h2 className="text-xl font-bold text-white mb-4 mt-2">История операций</h2>
                 <div className="bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden">
-                    {TRANSACTIONS.map((trx, idx) => (
-                        <div key={trx.id} className={clsx("p-5 flex items-center justify-between", idx !== TRANSACTIONS.length - 1 && "border-b border-neutral-800")}>
+                    {data.transactions.length === 0 ? (
+                        <div className="p-8 text-neutral-500 text-center text-sm">Нет недавних операций</div>
+                    ) : data.transactions.map((trx, idx) => (
+                        <div key={trx.id} className={clsx("p-5 flex items-center justify-between", idx !== data.transactions.length - 1 && "border-b border-neutral-800")}>
                             <div className="flex items-center gap-4">
                                 <div className={clsx(
                                     "p-3 rounded-xl",

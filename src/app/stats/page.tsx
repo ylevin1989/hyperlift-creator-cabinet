@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import {
     TrendingUp,
     Eye,
@@ -10,14 +11,62 @@ import {
     Activity
 } from 'lucide-react';
 import { Flexbox } from '@lobehub/ui';
+import { useGlobalStore } from '@/store/global';
 
-const MOCK_VIDEOS_STATS = [
-    { id: 1, name: 'Polaroid Распаковка', date: '12 Апр', views: '124K', likes: '12.4K', er: '11.5%', cpv: '0.12 ₽', thumbnail: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=100&h=100&fit=crop' },
-    { id: 2, name: 'Скетч FitApp', date: '05 Апр', views: '450K', likes: '55K', er: '14.2%', cpv: '0.08 ₽', thumbnail: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=100&h=100&fit=crop' },
-    { id: 3, name: 'Обзор мыши TechGear', date: '28 Мар', views: '89K', likes: '5.1K', er: '8.1%', cpv: '0.15 ₽', thumbnail: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=100&h=100&fit=crop' },
-];
+interface VideoStat {
+    id: string;
+    video_url: string;
+    views: number;
+    likes: number;
+    comments: number;
+    cpv: number;
+    er: number;
+    created_at: string;
+}
+
+interface StatsData {
+    profile: {
+        trust_score: number;
+        available_balance: number;
+        holding_balance: number;
+    };
+    metrics: {
+        totalViews: number;
+        avgER: string;
+        totalVideos: number;
+    };
+    videos: VideoStat[];
+}
 
 export default function StatsPage() {
+    const userId = useGlobalStore((s) => s.userId);
+    const [data, setData] = useState<StatsData | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!userId) return;
+        const fetchStats = async () => {
+            try {
+                const res = await fetch(`/api/stats?userId=${userId}`);
+                const json = await res.json();
+                if (res.ok) setData(json);
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchStats();
+    }, [userId]);
+
+    if (loading) {
+        return <div className="p-8 text-neutral-400 animate-pulse text-center">Загрузка статистики...</div>;
+    }
+
+    if (!data) {
+        return <div className="p-8 text-red-400 text-center">Ошибка загрузки статистики</div>;
+    }
+
     return (
         <div className="flex flex-col gap-8 animate-fade-in pb-8">
 
@@ -36,10 +85,10 @@ export default function StatsPage() {
                     <div className="relative">
                         <svg className="w-24 h-24 transform -rotate-90">
                             <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-neutral-800" />
-                            <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray="251.2" strokeDashoffset="5" className="text-orange-500" />
+                            <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray="251.2" strokeDashoffset={251.2 - (251.2 * data.profile.trust_score) / 100} className="text-orange-500" />
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <span className="text-2xl font-black text-white">98</span>
+                            <span className="text-2xl font-black text-white">{data.profile.trust_score}</span>
                         </div>
                     </div>
                     <div>
@@ -56,32 +105,28 @@ export default function StatsPage() {
                         <h3 className="text-neutral-400 font-medium text-sm">Просмотры</h3>
                         <div className="bg-purple-500/20 text-purple-400 p-1.5 rounded-lg"><Eye size={16} /></div>
                     </div>
-                    <p className="text-3xl font-bold text-white mb-2">1.2M</p>
-                    <span className="text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded-md font-medium">+15.2% к прошлому</span>
+                    <p className="text-3xl font-bold text-white mb-2">{data.metrics.totalViews >= 1000000 ? (data.metrics.totalViews / 1000000).toFixed(1) + 'M' : data.metrics.totalViews >= 1000 ? (data.metrics.totalViews / 1000).toFixed(1) + 'K' : data.metrics.totalViews}</p>
                 </div>
                 <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl">
                     <div className="flex justify-between items-start mb-2">
                         <h3 className="text-neutral-400 font-medium text-sm">ER (Вовлеченность)</h3>
                         <div className="bg-blue-500/20 text-blue-400 p-1.5 rounded-lg"><Activity size={16} /></div>
                     </div>
-                    <p className="text-3xl font-bold text-white mb-2">12.4%</p>
-                    <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded-md font-medium">-1.2% к прошлому</span>
+                    <p className="text-3xl font-bold text-white mb-2">{data.metrics.avgER}%</p>
                 </div>
                 <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl">
                     <div className="flex justify-between items-start mb-2">
-                        <h3 className="text-neutral-400 font-medium text-sm">Средний CPV</h3>
-                        <div className="bg-green-500/20 text-green-400 p-1.5 rounded-lg"><MousePointerClick size={16} /></div>
-                    </div>
-                    <p className="text-3xl font-bold text-white mb-2">0.10 ₽</p>
-                    <span className="text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded-md font-medium">+0.02 ₽ к прошлому</span>
-                </div>
-                <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl">
-                    <div className="flex justify-between items-start mb-2">
-                        <h3 className="text-neutral-400 font-medium text-sm">Конверсии (CPA)</h3>
+                        <h3 className="text-neutral-400 font-medium text-sm">Баланс Холд</h3>
                         <div className="bg-orange-500/20 text-orange-400 p-1.5 rounded-lg"><TrendingUp size={16} /></div>
                     </div>
-                    <p className="text-3xl font-bold text-white mb-2">142</p>
-                    <span className="text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded-md font-medium">+42 к прошлому</span>
+                    <p className="text-3xl font-bold text-white mb-2">{data.profile.holding_balance} ₽</p>
+                </div>
+                <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl">
+                    <div className="flex justify-between items-start mb-2">
+                        <h3 className="text-neutral-400 font-medium text-sm">Всего роликов</h3>
+                        <div className="bg-green-500/20 text-green-400 p-1.5 rounded-lg"><MousePointerClick size={16} /></div>
+                    </div>
+                    <p className="text-3xl font-bold text-white mb-2">{data.metrics.totalVideos}</p>
                 </div>
             </div>
 
@@ -89,31 +134,35 @@ export default function StatsPage() {
             <div>
                 <h2 className="text-xl font-bold text-white mb-4">Детализация по роликам</h2>
                 <div className="flex flex-col gap-3">
-                    {MOCK_VIDEOS_STATS.map(video => (
+                    {data.videos.length === 0 ? (
+                        <div className="text-neutral-500 text-sm">Нет утвержденных роликов с собранной статистикой.</div>
+                    ) : data.videos.map(video => (
                         <div key={video.id} className="bg-neutral-900 border border-neutral-800 p-4 rounded-2xl flex flex-col md:flex-row gap-4 items-center">
-                            <img src={video.thumbnail} alt={video.name} className="w-16 h-16 rounded-xl object-cover" />
+                            <div className="w-16 h-16 rounded-xl bg-neutral-800 flex items-center justify-center shrink-0">
+                                <Share2 className="text-neutral-500" />
+                            </div>
                             <div className="flex-1 w-full flex flex-col md:flex-row justify-between md:items-center gap-4">
                                 <div>
-                                    <h3 className="font-bold text-white text-lg">{video.name}</h3>
-                                    <span className="text-xs text-neutral-500 font-medium">Опубликовано: {video.date}</span>
+                                    <h3 className="font-bold text-white text-lg truncate max-w-[200px]">{video.video_url}</h3>
+                                    <span className="text-xs text-neutral-500 font-medium">Обновлено: {new Date(video.created_at).toLocaleDateString('ru-RU')}</span>
                                 </div>
 
                                 <div className="flex items-center gap-6 overflow-x-auto hide-scrollbar">
                                     <div>
                                         <div className="text-xs text-neutral-500 font-medium flex items-center gap-1 mb-1"><Eye size={12} /> Просмотры</div>
-                                        <div className="font-bold text-white text-lg">{video.views}</div>
+                                        <div className="font-bold text-white text-lg">{video.views >= 1000 ? (video.views / 1000).toFixed(1) + 'K' : video.views}</div>
                                     </div>
                                     <div>
                                         <div className="text-xs text-neutral-500 font-medium flex items-center gap-1 mb-1"><ThumbsUp size={12} /> Лайки</div>
-                                        <div className="font-bold text-white text-lg">{video.likes}</div>
+                                        <div className="font-bold text-white text-lg">{video.likes >= 1000 ? (video.likes / 1000).toFixed(1) + 'K' : video.likes}</div>
                                     </div>
                                     <div>
                                         <div className="text-xs text-neutral-500 font-medium flex items-center gap-1 mb-1"><Activity size={12} /> ER</div>
-                                        <div className="font-bold text-white text-lg">{video.er}</div>
+                                        <div className="font-bold text-white text-lg">{video.er}%</div>
                                     </div>
                                     <div>
                                         <div className="text-xs text-neutral-500 font-medium flex items-center gap-1 mb-1"><MousePointerClick size={12} /> CPV</div>
-                                        <div className="font-bold text-white text-lg text-green-400">{video.cpv}</div>
+                                        <div className="font-bold text-white text-lg text-green-400">{video.cpv} ₽</div>
                                     </div>
                                 </div>
                             </div>

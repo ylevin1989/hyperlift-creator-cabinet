@@ -9,18 +9,27 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
     "@lobehub/ui": "^4.38.4",
     "@supabase/supabase-js": "^2.97.0",
     "@tanstack/react-query": "^5.90.21",
     "antd": "^6.3.0",
     "antd-style": "^4.1.0",
+    "axios": "^1.13.5",
     "bcryptjs": "^3.0.3",
+    "cheerio": "^1.2.0",
     "clsx": "^2.1.1",
+    "dotenv": "^17.3.1",
     "lucide-react": "^0.575.0",
     "next": "16.1.6",
+    "puppeteer": "^24.37.5",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "tailwind-merge": "^3.5.0",
+    "yt-search": "^2.13.1",
+    "ytdl-core": "^4.11.5",
     "zustand": "^5.0.11"
   },
   "devDependencies": {

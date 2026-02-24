@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect, useState } from 'react';
 import { useGlobalStore } from '@/store/global';
-import { Home, BriefcaseBusiness, ListTodo, BarChart3, Wallet, User, BookOpen, ShieldAlert } from 'lucide-react';
+import { Home, BriefcaseBusiness, ListTodo, BarChart3, Wallet, User, BookOpen, ShieldAlert, Image } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Flexbox } from '@lobehub/ui';
 import clsx from 'clsx';
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
     { key: 'stats', label: 'Статистика', icon: BarChart3, path: '/stats' },
     { key: 'finances', label: 'Финансы', icon: Wallet, path: '/finances' },
     { key: 'profile', label: 'Профиль', icon: User, path: '/profile' },
+    { key: 'portfolio', label: 'Портфолио', icon: Image, path: '/portfolio' },
     { key: 'training', label: 'Обучение', icon: BookOpen, path: '/training' },
     { key: 'admin', label: 'Админка', icon: ShieldAlert, path: '/admin', adminOnly: true },
 ];

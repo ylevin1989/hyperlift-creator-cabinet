@@ -96,7 +96,7 @@ export default function LoginPage() {
                     </button>
 
                     <p className="text-center text-sm text-neutral-500 mt-6 font-medium">
-                        Хотите стать креатором? <a href="#" className="text-white hover:text-blue-400 underline decoration-neutral-700 underline-offset-4 transition-colors">Оставить заявку</a>
+                        Хотите стать креатором? <a href="/register" className="text-white hover:text-blue-400 underline decoration-neutral-700 underline-offset-4 transition-colors">Оставить заявку</a>
                     </p>
                 </form>
             </div>

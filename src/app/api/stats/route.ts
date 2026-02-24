@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     try {
         // 1. Fetch Creator Profile for Overall Trust Score & Balance
         const { data: profile, error: profileErr } = await supabase
-            .from('creators')
+            .from('cr_creators')
             .select('trust_score, available_balance, holding_balance')
             .eq('id', userId)
             .single();
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
 
         // 2. Fetch Aggregated stats for their videos
         const { data: videos, error: videosErr } = await supabase
-            .from('video_assets')
+            .from('cr_video_assets')
             .select('views, likes, cpv, er')
             .eq('creator_id', userId)
             .eq('status', 'approved');
@@ -40,7 +40,8 @@ export async function GET(request: Request) {
                 totalViews,
                 avgER: avgER.toFixed(2),
                 totalVideos: videos?.length || 0
-            }
+            },
+            videos: videos || []
         });
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 500 });

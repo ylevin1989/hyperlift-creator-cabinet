@@ -12,8 +12,8 @@ export async function GET(request: Request) {
 
     try {
         const { data: projects, error } = await supabase
-            .from('projects')
-            .select('*, brief:briefs(*)')
+            .from('cr_projects')
+            .select('*, brief:cr_briefs(*), video_assets:cr_video_assets(*)')
             .eq('creator_id', userId)
             .order('updated_at', { ascending: false });
 
@@ -25,10 +25,34 @@ export async function GET(request: Request) {
     }
 }
 
-// POST - Submit a new video link for a project
+// POST - Submit a new video link for a project or create a new project
 export async function POST(request: Request) {
     try {
-        const { projectId, videoUrl, userId } = await request.json();
+        const input = await request.json();
+
+        // Handle creating a new independent project
+        if (input.action === 'create') {
+            const { title, reward, userId } = input;
+            if (!title || !userId) {
+                return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+            }
+
+            const { data: project, error: insertError } = await supabase
+                .from('cr_projects')
+                .insert({
+                    creator_id: userId,
+                    title,
+                    reward: reward || 0,
+                    status: 'Ожидание товара'
+                })
+                .select()
+                .single();
+
+            if (insertError) throw insertError;
+            return NextResponse.json({ success: true, project });
+        }
+
+        const { projectId, videoUrl, userId } = input;
 
         if (!projectId || !videoUrl || !userId) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -36,7 +60,7 @@ export async function POST(request: Request) {
 
         // Start by verifying ownership and inserting video asset
         const { data: asset, error: assetError } = await supabase
-            .from('video_assets')
+            .from('cr_video_assets')
             .insert({ project_id: projectId, creator_id: userId, video_url: videoUrl, status: 'pending_review' })
             .select()
             .single();
@@ -45,7 +69,7 @@ export async function POST(request: Request) {
 
         // Update project status to 'Модерация'
         const { error: updateError } = await supabase
-            .from('projects')
+            .from('cr_projects')
             .update({ status: 'Модерация', updated_at: new Date().toISOString() })
             .eq('id', projectId);
 

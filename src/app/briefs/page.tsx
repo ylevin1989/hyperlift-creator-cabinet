@@ -1,53 +1,80 @@
 'use client';
 
-import { Flexbox, ActionIcon } from '@lobehub/ui';
-import { Search, Filter, SlidersHorizontal, MapPin, Target, Wallet, ArrowRight, Video } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Search, SlidersHorizontal, Target, Wallet, ArrowRight, Video, CheckCircle2 } from 'lucide-react';
+import { ActionIcon } from '@lobehub/ui';
 import clsx from 'clsx';
+import { useGlobalStore } from '@/store/global';
+import { useRouter } from 'next/navigation';
 
-const MOCK_BRIEFS = [
-    {
-        id: 1,
-        brand: 'GlowUp Cosmetics',
-        logo: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=100&h=100&fit=crop',
-        title: 'Набор для ухода за лицом',
-        format: 'Testimonial',
-        niche: 'Beauty',
-        reward: '8 000 ₽ + Товар',
-        kpi: false,
-        description: 'Нужен честный отзыв на новую линейку сывороток после 7 дней использования.',
-        requirements: 'Девушки 18-35 лет, чистая кожа.',
-    },
-    {
-        id: 2,
-        brand: 'FitApp',
-        logo: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=100&h=100&fit=crop',
-        title: 'Подписка на фитнес-трекер',
-        format: 'Sketch',
-        niche: 'Apps',
-        reward: 'Фикс 12 000 ₽ + 15% CPA',
-        kpi: true,
-        description: 'Смешной скетч про попытки начать бегать с понедельника. Интеграция приложения в развязке.',
-        requirements: 'Любой пол, наличие кроссовок.',
-    },
-    {
-        id: 3,
-        brand: 'TechGear',
-        logo: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=100&h=100&fit=crop',
-        title: 'TWS Наушники SoundPro',
-        format: 'Unboxing',
-        niche: 'Gadgets',
-        reward: '15 000 ₽',
-        kpi: false,
-        description: 'ASMR распаковка наушников. Акцент на премиальный дизайн кейса и звук щёлканья.',
-        requirements: 'Эстетичный фон (минимализм), хороший свет.',
-    }
-];
+interface Brief {
+    id: string;
+    brand: string;
+    title: string;
+    format: string;
+    niche: string;
+    reward: number;
+    description: string;
+    requirements: string;
+    cover_url?: string;
+    status: string;
+}
 
 const CATEGORIES = ['Все', 'Beauty', 'Apps', 'Gadgets', 'Лайфстайл', 'Одежда'];
 
 export default function BriefsPage() {
     const [activeTab, setActiveTab] = useState('Все');
+    const [briefs, setBriefs] = useState<Brief[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [applyingId, setApplyingId] = useState<string | null>(null);
+    const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set());
+    const userId = useGlobalStore((s) => s.userId);
+    const router = useRouter();
+
+    useEffect(() => {
+        const fetchBriefs = async () => {
+            try {
+                const nicheParam = activeTab !== 'Все' ? `?niche=${activeTab}` : '';
+                const res = await fetch(`/api/briefs${nicheParam}`);
+                const data = await res.json();
+                if (res.ok) setBriefs(data.briefs || []);
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchBriefs();
+    }, [activeTab]);
+
+    const handleApply = async (briefId: string) => {
+        if (!userId) {
+            router.push('/login');
+            return;
+        }
+        setApplyingId(briefId);
+        try {
+            const res = await fetch('/api/briefs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ briefId, userId })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setAppliedIds(prev => new Set(prev).add(briefId));
+            } else {
+                alert(data.error || 'Ошибка отклика');
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setApplyingId(null);
+        }
+    };
+
+    if (loading) {
+        return <div className="p-8 text-neutral-400 animate-pulse text-center">Загрузка брифов...</div>;
+    }
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in pb-8">
@@ -96,37 +123,44 @@ export default function BriefsPage() {
 
             {/* Brief Cards Grid */}
             <div className="grid md:grid-cols-2 gap-5 mt-2">
-                {MOCK_BRIEFS.filter(b => activeTab === 'Все' || b.niche === activeTab).map(brief => (
+                {briefs.length === 0 ? (
+                    <div className="text-neutral-500 text-sm col-span-2 text-center py-12">Нет доступных брифов в категории «{activeTab}».</div>
+                ) : briefs.map(brief => (
                     <div key={brief.id} className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl flex flex-col group hover:border-neutral-700 transition-colors">
                         {/* Card Header */}
                         <div className="flex items-start gap-4 mb-4">
-                            <img src={brief.logo} alt={brief.brand} className="w-14 h-14 rounded-2xl object-cover ring-2 ring-neutral-800" />
+                            <div className="w-14 h-14 rounded-2xl bg-neutral-800 flex items-center justify-center ring-2 ring-neutral-700 text-white font-black text-lg uppercase">
+                                {brief.brand?.charAt(0) || '?'}
+                            </div>
                             <div className="flex-1">
                                 <h3 className="font-bold text-white text-lg leading-tight">{brief.brand}</h3>
                                 <p className="text-neutral-400 text-sm font-medium">{brief.title}</p>
                             </div>
-                            {brief.kpi && (
-                                <div className="bg-green-500/20 text-green-400 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg">CPA + %</div>
-                            )}
                         </div>
 
                         {/* Tags */}
                         <div className="flex flex-wrap gap-2 mb-4">
-                            <span className="flex items-center gap-1 bg-neutral-800 text-neutral-300 text-xs px-2.5 py-1 rounded-lg font-medium">
-                                <Video size={12} /> {brief.format}
-                            </span>
-                            <span className="flex items-center gap-1 bg-neutral-800 text-neutral-300 text-xs px-2.5 py-1 rounded-lg font-medium">
-                                <Target size={12} /> {brief.niche}
-                            </span>
+                            {brief.format && (
+                                <span className="flex items-center gap-1 bg-neutral-800 text-neutral-300 text-xs px-2.5 py-1 rounded-lg font-medium">
+                                    <Video size={12} /> {brief.format}
+                                </span>
+                            )}
+                            {brief.niche && (
+                                <span className="flex items-center gap-1 bg-neutral-800 text-neutral-300 text-xs px-2.5 py-1 rounded-lg font-medium">
+                                    <Target size={12} /> {brief.niche}
+                                </span>
+                            )}
                         </div>
 
                         {/* Description */}
                         <p className="text-neutral-400 text-sm mb-4 line-clamp-2">{brief.description}</p>
 
                         {/* Requirements line */}
-                        <div className="bg-neutral-950/50 rounded-xl p-3 mb-5 border border-neutral-800/50">
-                            <p className="text-xs text-neutral-500 leading-relaxed"><span className="text-white/70 font-medium">Кого ищем:</span> {brief.requirements}</p>
-                        </div>
+                        {brief.requirements && (
+                            <div className="bg-neutral-950/50 rounded-xl p-3 mb-5 border border-neutral-800/50">
+                                <p className="text-xs text-neutral-500 leading-relaxed"><span className="text-white/70 font-medium">Кого ищем:</span> {brief.requirements}</p>
+                            </div>
+                        )}
 
                         {/* Footer with Action */}
                         <div className="mt-auto flex items-center justify-between pt-4 border-t border-neutral-800">
@@ -134,12 +168,22 @@ export default function BriefsPage() {
                                 <div className="bg-blue-500/10 p-2 rounded-xl text-blue-500">
                                     <Wallet size={16} />
                                 </div>
-                                <div className="font-black text-white">{brief.reward}</div>
+                                <div className="font-black text-white">от {brief.reward} ₽</div>
                             </div>
 
-                            <button className="bg-white text-black hover:bg-neutral-200 px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 shadow-[0_4px_14px_0_rgba(255,255,255,0.1)]">
-                                Откликнуться <ArrowRight size={16} />
-                            </button>
+                            {appliedIds.has(brief.id) ? (
+                                <div className="flex items-center gap-2 text-green-400 text-sm font-bold">
+                                    <CheckCircle2 size={18} /> Вы откликнулись
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => handleApply(brief.id)}
+                                    disabled={applyingId === brief.id}
+                                    className="bg-white text-black hover:bg-neutral-200 disabled:opacity-50 px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 shadow-[0_4px_14px_0_rgba(255,255,255,0.1)]"
+                                >
+                                    {applyingId === brief.id ? 'Отправка...' : 'Откликнуться'} <ArrowRight size={16} />
+                                </button>
+                            )}
                         </div>
                     </div>
                 ))}
