@@ -4,7 +4,6 @@ import { ReactNode, useEffect, useState } from 'react';
 import { useGlobalStore } from '@/store/global';
 import { Home, BriefcaseBusiness, ListTodo, BarChart3, Wallet, User, BookOpen, ShieldAlert, Image } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Flexbox } from '@lobehub/ui';
 import clsx from 'clsx';
 import { supabase } from '@/lib/supabase';
 
@@ -24,11 +23,12 @@ export const MainLayout = ({ children }: { children: ReactNode }) => {
     const storeIsMobile = useGlobalStore((s) => s.isMobile);
     const setIsMobile = useGlobalStore((s) => s.setIsMobile);
     const storeUserId = useGlobalStore((s) => s.userId);
+    const storeUserRole = useGlobalStore((s) => s.userRole);
+    const setUserRole = useGlobalStore((s) => s.setUserRole);
     const hasHydrated = useGlobalStore((s) => s._hasHydrated);
     const router = useRouter();
     const pathname = usePathname();
     const [mounted, setMounted] = useState(false);
-    const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
         setMounted(true);
@@ -38,33 +38,32 @@ export const MainLayout = ({ children }: { children: ReactNode }) => {
         return () => window.removeEventListener('resize', checkMobile);
     }, [setIsMobile]);
 
-    // To prevent hydration mismatch, the first client render MUST match the server render exactly.
-    // The server has no access to localStorage, so userId is null and isMobile is false.
     const userId = mounted && hasHydrated ? storeUserId : null;
     const isMobile = mounted ? storeIsMobile : false;
 
+    // Sync role from DB once on login
     useEffect(() => {
         if (!hasHydrated) return;
 
         if (!storeUserId && pathname !== '/login' && pathname !== '/register') {
             router.push('/login');
-        } else if (storeUserId) {
-            const checkAdmin = async () => {
+        } else if (storeUserId && !storeUserRole) {
+            (async () => {
                 const { data } = await supabase.from('cr_creators').select('role').eq('id', storeUserId).single();
-                if (data && data.role === 'admin') {
-                    setIsAdmin(true);
+                if (data?.role) {
+                    setUserRole(data.role as 'creator' | 'admin');
                 }
-            };
-            checkAdmin();
+            })();
         }
-    }, [hasHydrated, storeUserId, pathname, router]);
+    }, [hasHydrated, storeUserId, pathname, router, storeUserRole, setUserRole]);
+
+    const isAdmin = storeUserRole === 'admin';
 
     if (pathname === '/login' || pathname === '/register') {
         return <main>{children}</main>;
     }
 
     if (!userId && pathname !== '/register') {
-        // We match what the server renders before authentication is confirmed.
         return <main className="min-h-screen bg-neutral-950">{!mounted ? children : null}</main>;
     }
 

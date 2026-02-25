@@ -47,6 +47,21 @@ export default function BriefsPage() {
         fetchBriefs();
     }, [activeTab]);
 
+    // Load existing applications
+    useEffect(() => {
+        if (!userId) return;
+        (async () => {
+            try {
+                const res = await fetch(`/api/applications?userId=${userId}`);
+                const data = await res.json();
+                if (res.ok && data.applications) {
+                    const ids = new Set<string>(data.applications.map((a: any) => a.brief_id));
+                    setAppliedIds(ids);
+                }
+            } catch (e) { console.error(e); }
+        })();
+    }, [userId]);
+
     const handleApply = async (briefId: string) => {
         if (!userId) {
             router.push('/login');
@@ -54,10 +69,10 @@ export default function BriefsPage() {
         }
         setApplyingId(briefId);
         try {
-            const res = await fetch('/api/briefs', {
+            const res = await fetch('/api/applications', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ briefId, userId })
+                body: JSON.stringify({ action: 'apply', briefId, userId })
             });
             const data = await res.json();
             if (res.ok && data.success) {
