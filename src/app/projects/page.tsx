@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useGlobalStore } from '@/store/global';
+import { PLATFORMS, formatNumber, getYouTubeThumbnail } from '@/lib/utils';
 
 interface KpiConfig {
     metric: string;
@@ -53,17 +54,6 @@ interface Project {
     kpi_configs?: KpiConfig[];
 }
 
-const PLATFORMS = [
-    { key: 'youtube', label: 'YouTube', color: 'text-red-400 bg-red-500/10' },
-    { key: 'tiktok', label: 'TikTok', color: 'text-violet-400 bg-violet-500/10' },
-    { key: 'instagram', label: 'Instagram', color: 'text-pink-400 bg-pink-500/10' },
-    { key: 'vk', label: 'ВК', color: 'text-blue-400 bg-blue-500/10' },
-    { key: 'threads', label: 'Threads', color: 'text-neutral-300 bg-neutral-500/10' },
-    { key: 'telegram', label: 'Telegram', color: 'text-sky-400 bg-sky-500/10' },
-    { key: 'max', label: 'Макс', color: 'text-cyan-400 bg-cyan-500/10' },
-    { key: 'likee', label: 'Лайки', color: 'text-orange-400 bg-orange-500/10' },
-];
-
 const STATUS_COLORS: Record<string, string> = {
     'Ожидание товара': 'text-neutral-400 bg-neutral-500/10 border-neutral-500/20',
     'ТЗ': 'text-blue-400 bg-blue-500/10 border-blue-500/20',
@@ -72,18 +62,6 @@ const STATUS_COLORS: Record<string, string> = {
     'Правки': 'text-red-400 bg-red-500/10 border-red-500/20',
     'Утверждено': 'text-green-400 bg-green-500/10 border-green-500/20',
     'Закрыто': 'text-neutral-500 bg-neutral-800/10 border-neutral-700/20'
-};
-
-const formatNumber = (n: number) => {
-    if (!n) return '0';
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
-    return n.toLocaleString('ru-RU');
-};
-
-const getYouTubeThumbnail = (url: string) => {
-    const match = url.match(/[?&]v=([A-Za-z0-9_-]{11})/) || url.match(/youtu\.be\/([A-Za-z0-9_-]{11})/);
-    return match ? `https://i.ytimg.com/vi/${match[1]}/hqdefault.jpg` : '';
 };
 
 export default function ProjectsPage() {

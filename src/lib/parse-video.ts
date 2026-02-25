@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Video metrics parser for YouTube, TikTok, Instagram
  * 
@@ -30,7 +29,7 @@ export async function parseVideoMetrics(url: string): Promise<VideoMetrics> {
         if (url.includes('instagram.com')) {
             return await parseInstagram(url);
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('parseVideoMetrics top-level error:', e);
     }
     return { title: '', views: 0, likes: 0, comments: 0 };
@@ -102,7 +101,7 @@ async function parseYouTube(url: string): Promise<VideoMetrics> {
             }
         }
 
-    } catch (e) {
+    } catch (e: any) {
         console.error('YouTube parse error:', e?.message || e);
     }
 
@@ -130,7 +129,7 @@ async function parseYouTube(url: string): Promise<VideoMetrics> {
                     clearTimeout(timeout);
                 }
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error('[YT Parser] YouTube API error:', e?.message || e);
         }
     } else if (!comments) {
@@ -211,7 +210,7 @@ async function parseTikTok(url: string): Promise<VideoMetrics> {
                     clearTimeout(timeout);
                 }
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error('[TT Parser] RapidAPI error:', e?.message || e);
         }
     }
@@ -247,7 +246,7 @@ async function parseTikTok(url: string): Promise<VideoMetrics> {
             if (diggMatch) likes = parseInt(diggMatch[1], 10);
             if (commentMatch) comments = parseInt(commentMatch[1], 10);
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('TikTok parse error:', e?.message || e);
     }
     return { title, views, likes, comments, thumbnail_url };
@@ -268,7 +267,7 @@ async function parseInstagram(url: string): Promise<VideoMetrics> {
             // Always return RapidAPI result, even if zeros — it's more trustworthy
             // than cached embed pages. For photos, views=0 is expected.
             return result;
-        } catch (e) {
+        } catch (e: any) {
             console.error('[IG Parser] RapidAPI failed:', e?.message || e);
             // Only fall through to other strategies if RapidAPI itself errors
         }
@@ -284,7 +283,7 @@ async function parseInstagram(url: string): Promise<VideoMetrics> {
             console.log('[IG Parser] Embed success:', result);
             return result;
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('[IG Parser] Embed error:', e?.message || e);
     }
 
@@ -296,7 +295,7 @@ async function parseInstagram(url: string): Promise<VideoMetrics> {
             console.log('[IG Parser] Direct success:', result);
             return result;
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('[IG Parser] Direct error:', e?.message || e);
     }
 
@@ -309,7 +308,7 @@ async function parseInstagram(url: string): Promise<VideoMetrics> {
             console.log('[IG Parser] Puppeteer success:', result);
             return result;
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('[IG Parser] Puppeteer error:', e?.message || e);
     }
 
@@ -365,7 +364,7 @@ async function parseInstagramEmbed(url: string): Promise<VideoMetrics> {
     if (viewsMatch) views = parseInt(viewsMatch[1].replace(/\D/g, ''), 10);
 
     // Title from caption
-    const captionMatch = html.match(/<div class="Caption"[^>]*>.*?<span>(.*?)<\/span>/s) ||
+    const captionMatch = html.match(/<div class="Caption"[^>]*>[\s\S]*?<span>([\s\S]*?)<\/span>/) ||
         html.match(/"caption":\{"text":"([^"]{0,100})"/);
     if (captionMatch) {
         title = captionMatch[1].replace(/<[^>]+>/g, '').trim();
@@ -429,7 +428,7 @@ async function parseInstagramPuppeteer(url: string): Promise<VideoMetrics> {
     try {
         puppeteerExtra = await import('puppeteer-extra');
         StealthPlugin = await import('puppeteer-extra-plugin-stealth');
-    } catch (e) {
+    } catch (e: any) {
         console.error('[IG Puppeteer] Cannot import puppeteer:', e?.message);
         throw new Error('Puppeteer not available');
     }
@@ -440,7 +439,7 @@ async function parseInstagramPuppeteer(url: string): Promise<VideoMetrics> {
     let browser;
     try {
         browser = await puppeteer.launch({
-            headless: 'new',
+            headless: true,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -450,7 +449,7 @@ async function parseInstagramPuppeteer(url: string): Promise<VideoMetrics> {
                 '--disable-features=site-per-process',
             ]
         });
-    } catch (e) {
+    } catch (e: any) {
         console.error('[IG Puppeteer] Failed to launch browser:', e?.message);
         throw new Error('Cannot launch browser: ' + (e?.message || ''));
     }
@@ -541,7 +540,21 @@ async function parseInstagramRapidAPI(url: string, apiKey: string): Promise<Vide
             },
             signal: controller.signal,
         });
+
+        // Check for API errors (quota exceeded, unauthorized, etc.)
+        if (!res.ok) {
+            const errBody = await res.text();
+            console.error(`[IG RapidAPI] HTTP ${res.status}: ${errBody}`);
+            throw new Error(`RapidAPI HTTP ${res.status}: ${errBody}`);
+        }
+
         const data = await res.json();
+
+        // Check for API-level errors
+        if (data?.message && !data?.data) {
+            console.error('[IG RapidAPI] API error:', data.message);
+            throw new Error(`RapidAPI error: ${data.message}`);
+        }
 
         const media = data?.data?.shortcode_media;
         if (media) {
@@ -558,6 +571,8 @@ async function parseInstagramRapidAPI(url: string, apiKey: string): Promise<Vide
                 const fullTitle = captionEdges[0].node.text;
                 title = fullTitle.length > 60 ? fullTitle.substring(0, 60) + '...' : fullTitle;
             }
+        } else {
+            console.warn('[IG RapidAPI] No shortcode_media in response');
         }
     } finally {
         clearTimeout(timeout);
@@ -582,7 +597,7 @@ export async function parseFollowerCount(url: string): Promise<number> {
         if (url.includes('instagram.com')) {
             return await getInstagramFollowers(url);
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('parseFollowerCount error:', e?.message || e);
     }
     return 0;
@@ -613,7 +628,7 @@ async function getYouTubeSubscribers(url: string): Promise<number> {
             } finally {
                 clearTimeout(timeout);
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error('[YT Subscribers] API error:', e?.message);
         }
     }
@@ -626,7 +641,7 @@ async function getYouTubeSubscribers(url: string): Promise<number> {
         if (match) {
             return parseHumanNumber(match[1]);
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('[YT Subscribers] Scrape error:', e?.message);
     }
     return 0;
@@ -645,7 +660,7 @@ async function getTikTokFollowers(url: string): Promise<number> {
         // Try from meta description: "123K Followers"
         const metaMatch = html.match(/([\d,.]+[KMB]?)\s*Followers/i);
         if (metaMatch) return parseHumanNumber(metaMatch[1]);
-    } catch (e) {
+    } catch (e: any) {
         console.error('[TikTok Followers] error:', e?.message);
     }
     return 0;
@@ -665,7 +680,7 @@ async function getInstagramFollowers(url: string): Promise<number> {
             html.match(/"follower_count":(\d+)/) ||
             html.match(/([\d,.]+)\s*Followers/i);
         if (match) return parseHumanNumber(match[1]);
-    } catch (e) {
+    } catch (e: any) {
         console.error('[IG Followers] scrape error:', e?.message);
     }
 
@@ -694,7 +709,7 @@ async function getInstagramFollowers(url: string): Promise<number> {
             } finally {
                 clearTimeout(timeout);
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error('[IG Followers] RapidAPI error:', e?.message);
         }
     }

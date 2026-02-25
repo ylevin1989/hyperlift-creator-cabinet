@@ -1,18 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { notifyNewVideo } from '@/lib/telegram-notify';
-
-// Helper: detect platform from URL
-function detectPlatform(url: string): string {
-    if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
-    if (url.includes('tiktok.com')) return 'tiktok';
-    if (url.includes('instagram.com')) return 'instagram';
-    if (url.includes('vk.com') || url.includes('vk.video')) return 'vk';
-    if (url.includes('threads.net')) return 'threads';
-    if (url.includes('t.me') || url.includes('telegram.me') || url.includes('telegram.org')) return 'telegram';
-    if (url.includes('likee.video') || url.includes('likee.com')) return 'likee';
-    return 'other';
-}
+import { detectPlatform } from '@/lib/utils';
 
 // GET Projects — role-aware
 export async function GET(request: Request) {
@@ -41,6 +30,7 @@ export async function GET(request: Request) {
                 .select(`
                     *, 
                     brief:cr_briefs(*),
+                    brand_ref:cr_brands(id, name, logo_url, color),
                     video_assets:cr_video_assets(id, title, video_url, views, likes, comments, status, platform, thumbnail_url, creator_id, last_stats_update, kpi_bonus),
                     assignments:cr_project_creators(id, creator_id, status, creator:cr_creators(id, full_name, username, avatar_url))
                 `)
@@ -109,7 +99,7 @@ export async function POST(request: Request) {
 
         // Create project (admin only)
         if (input.action === 'create') {
-            const { title, description, brand, reward, cover_url, deadline, userId } = input;
+            const { title, description, brand, brand_id, reward, cover_url, deadline, userId } = input;
             if (!title || !userId) {
                 return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
             }
@@ -125,12 +115,20 @@ export async function POST(request: Request) {
                 return NextResponse.json({ error: 'Only admins can create projects' }, { status: 403 });
             }
 
+            // If brand_id provided, get brand name
+            let brandName = brand || null;
+            if (brand_id && !brandName) {
+                const { data: brandData } = await supabase.from('cr_brands').select('name').eq('id', brand_id).single();
+                if (brandData) brandName = brandData.name;
+            }
+
             const { data: project, error: insertError } = await supabase
                 .from('cr_projects')
                 .insert({
                     title,
                     description: description || null,
-                    brand: brand || null,
+                    brand: brandName,
+                    brand_id: brand_id || null,
                     reward: reward || '0',
                     cover_url: cover_url || null,
                     deadline: deadline || null,
@@ -171,6 +169,31 @@ export async function POST(request: Request) {
             .from('cr_projects')
             .update({ updated_at: new Date().toISOString() })
             .eq('id', projectId);
+
+        // Auto-parse video metrics (non-blocking)
+        const { parseVideoMetrics } = await import('@/lib/parse-video');
+        (async () => {
+            try {
+                console.log('[Auto-parse] Fetching metrics for:', videoUrl);
+                const metrics = await parseVideoMetrics(videoUrl);
+                if (metrics.title || metrics.views > 0 || metrics.likes > 0) {
+                    const updateData: any = {
+                        title: metrics.title || undefined,
+                        views: metrics.views || undefined,
+                        likes: metrics.likes || undefined,
+                        comments: metrics.comments || undefined,
+                        last_stats_update: new Date().toISOString()
+                    };
+                    if (metrics.thumbnail_url) updateData.thumbnail_url = metrics.thumbnail_url;
+                    // Remove undefined values
+                    Object.keys(updateData).forEach(k => updateData[k] === undefined && delete updateData[k]);
+                    await supabase.from('cr_video_assets').update(updateData).eq('id', asset.id);
+                    console.log('[Auto-parse] Updated:', asset.id, metrics.title, metrics.views);
+                }
+            } catch (e: any) {
+                console.error('[Auto-parse] Error:', e?.message);
+            }
+        })();
 
         // Send Telegram notification (non-blocking)
         try {

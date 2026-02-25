@@ -74,6 +74,9 @@ export async function POST(request: Request) {
         } else if (action === 'reject') {
             const { error } = await supabase.from('cr_video_assets').update({ status: 'rejected' }).eq('id', assetId);
             if (error) throw error;
+        } else if (action === 'delete') {
+            const { error } = await supabase.from('cr_video_assets').delete().eq('id', assetId);
+            if (error) throw error;
         } else if (action === 'update_metrics') {
             // Manual metrics update by admin
             const { views, likes, comments: commentCount } = body;
@@ -92,13 +95,15 @@ export async function POST(request: Request) {
             const metrics = await parseVideoMetrics(asset.video_url);
 
             if (metrics.views > 0 || metrics.likes > 0 || metrics.comments > 0 || metrics.title) {
-                const { error: updateErr } = await supabase.from('cr_video_assets').update({
+                const updateData: any = {
                     title: metrics.title || 'Без названия',
                     views: metrics.views,
                     likes: metrics.likes,
                     comments: metrics.comments,
                     last_stats_update: new Date().toISOString()
-                }).eq('id', assetId);
+                };
+                if (metrics.thumbnail_url) updateData.thumbnail_url = metrics.thumbnail_url;
+                const { error: updateErr } = await supabase.from('cr_video_assets').update(updateData).eq('id', assetId);
                 if (updateErr) throw updateErr;
             } else {
                 return NextResponse.json({ error: 'Не удалось получить метрики. Попробуйте ввести вручную.' }, { status: 400 });

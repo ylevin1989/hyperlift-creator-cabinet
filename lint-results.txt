@@ -1,0 +1,195 @@
+
+> hyperlift-creator-cabinet@0.1.0 lint
+> eslint
+
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/admin/page.tsx
+    6:50  warning  'Shield' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+    7:5   warning  'Target' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+    7:28  warning  'Loader2' is defined but never used                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+   32:46  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   33:46  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   34:54  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   35:42  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  173:95  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  175:55  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  222:74  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  223:65  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  236:45  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  274:68  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  277:86  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  277:86  warning  img elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                                jsx-a11y/alt-text
+  291:95  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  307:80  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  334:74  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  341:97  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  351:82  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  351:82  warning  img elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                                jsx-a11y/alt-text
+  442:61  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  442:61  warning  img elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                                jsx-a11y/alt-text
+  469:49  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  469:49  warning  img elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                                jsx-a11y/alt-text
+  503:64  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  503:64  warning  img elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                                jsx-a11y/alt-text
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/api/admin/assets/route.ts
+   39:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   98:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  116:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/api/applications/route.ts
+  32:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  87:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/api/auth/login/route.ts
+  36:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/api/auth/register/route.ts
+  50:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/api/brands/route.ts
+  14:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  74:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/api/briefs/route.ts
+  20:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/api/finances/route.ts
+  33:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  46:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  49:26  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  65:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  92:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/api/portfolio/route.ts
+   56:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  116:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/api/profile/route.ts
+  48:14  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/api/profile/sync-social/route.ts
+  34:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/api/projects/[id]/creators/route.ts
+   42:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  116:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/api/projects/route.ts
+   90:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  180:39  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  193:25  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  209:18  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+  212:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/api/stats/route.ts
+  46:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/briefs/page.tsx
+  58:75  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/dashboard/page.tsx
+   6:5    warning  'TrendingUp' is defined but never used                           @typescript-eslint/no-unused-vars
+  14:5    warning  'ArrowUpRight' is defined but never used                         @typescript-eslint/no-unused-vars
+  16:31   warning  'Avatar' is defined but never used                               @typescript-eslint/no-unused-vars
+  17:8    warning  'clsx' is defined but never used                                 @typescript-eslint/no-unused-vars
+  25:40   error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+  26:58   error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+  27:60   error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+  48:69   error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+  93:110  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  93:117  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/finances/page.tsx
+  10:5  warning  'CreditCard' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/login/page.tsx
+  35:18  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/portfolio/page.tsx
+    4:11  warning  'X' is defined but never used                                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+   40:46  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   83:44  warning  React Hook useEffect has a missing dependency: 'fetchPortfolio'. Either include it or remove the dependency array                                                                                                                                                                        react-hooks/exhaustive-deps
+   95:25  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  193:29  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  338:37  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  484:41  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/profile/page.tsx
+   35:46  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   41:39  warning  'platform' is defined but never used                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+   55:44  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   59:58  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  166:21  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  271:63  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  410:41  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/projects/page.tsx
+    6:5   warning  'ChevronRight' is defined but never used                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+   92:8   warning  React Hook useEffect has a missing dependency: 'fetchProjects'. Either include it or remove the dependency array                                                                                                                                                                         react-hooks/exhaustive-deps
+  168:49  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  322:65  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/register/page.tsx
+  85:18  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/app/training/page.tsx
+    4:5   warning  'BookOpen' is defined but never used                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+   80:29  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+   80:29  warning  img elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                                jsx-a11y/alt-text
+   95:29  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+   95:29  warning  img elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                                jsx-a11y/alt-text
+  110:29  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  110:29  warning  img elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                                jsx-a11y/alt-text
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/components/layout/MainLayout.tsx
+  34:9  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/components/layout/MainLayout.tsx:34:9
+  32 |
+  33 |     useEffect(() => {
+> 34 |         setMounted(true);
+     |         ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  35 |         const checkMobile = () => setIsMobile(window.innerWidth < 768);
+  36 |         checkMobile();
+  37 |         window.addEventListener('resize', checkMobile);  react-hooks/set-state-in-effect
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/lib/parse-video.ts
+   32:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  104:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  132:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  213:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  249:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  270:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  286:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  298:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  311:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  431:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  452:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  464:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  600:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  631:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  644:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  663:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  683:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  712:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/src/lib/telegram-notify.ts
+  70:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/supabase/functions/sync-social-metrics/index.ts
+   70:18  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+  112:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/workspace/.gemini/antigravity/scratch/hyperlift-creator-cabinet/test-db4.js
+  1:1   error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  2:20  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+✖ 117 problems (73 errors, 44 warnings)
+

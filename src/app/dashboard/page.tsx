@@ -17,6 +17,7 @@ import { Flexbox, ActionIcon, Avatar } from '@lobehub/ui';
 import clsx from 'clsx';
 import { useRouter } from 'next/navigation';
 import { useGlobalStore } from '@/store/global';
+import { formatNumber } from '@/lib/utils';
 
 export default function DashboardPage() {
     const router = useRouter();
@@ -90,7 +91,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex-1">
                             <h4 className="font-bold text-amber-500">Правки от модератора</h4>
-                            <p className="text-sm text-amber-200/70 mt-0.5">У вас есть проекты на доработке ("Правки").</p>
+                            <p className="text-sm text-amber-200/70 mt-0.5">У вас есть проекты на доработке (&quot;Правки&quot;).</p>
                         </div>
                         <ActionIcon icon={ChevronRight} className="text-amber-400" />
                     </div>
@@ -107,6 +108,9 @@ export default function DashboardPage() {
                         </div>
                         <h3 className="text-blue-200 font-medium text-sm">Доступно</h3>
                         <p className="text-3xl font-black text-white mt-1">{stats.profile?.available_balance || 0} ₽</p>
+                        {stats.metrics?.totalKpi > 0 && (
+                            <p className="text-xs text-blue-200 mt-1">Из них по KPI: +{stats.metrics.totalKpi} ₽</p>
+                        )}
                     </div>
 
                     {/* Views */}
@@ -115,7 +119,7 @@ export default function DashboardPage() {
                             <h3 className="text-neutral-400 font-medium text-sm">Охват</h3>
                             <div className="bg-purple-500/20 text-purple-400 p-1.5 rounded-lg"><Eye size={16} /></div>
                         </div>
-                        <p className="text-2xl font-bold text-white">{stats.metrics?.totalViews >= 1000000 ? (stats.metrics.totalViews / 1000000).toFixed(1) + 'M' : stats.metrics?.totalViews >= 1000 ? (stats.metrics.totalViews / 1000).toFixed(1) + 'K' : stats.metrics?.totalViews || 0}</p>
+                        <p className="text-2xl font-bold text-white">{formatNumber(stats.metrics?.totalViews || 0)}</p>
                     </div>
 
                     {/* Approved */}

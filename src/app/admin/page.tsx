@@ -9,19 +9,9 @@ import {
 import clsx from 'clsx';
 import { useGlobalStore } from '@/store/global';
 import { supabase } from '@/lib/supabase';
+import { PLATFORMS, formatNumber, getYouTubeThumbnail, getProjectThumbnail } from '@/lib/utils';
 
 type AdminTab = 'projects' | 'creators' | 'applications';
-
-const PLATFORMS = [
-    { key: 'youtube', label: 'YouTube', color: 'text-red-400 bg-red-500/10' },
-    { key: 'tiktok', label: 'TikTok', color: 'text-violet-400 bg-violet-500/10' },
-    { key: 'instagram', label: 'Instagram', color: 'text-pink-400 bg-pink-500/10' },
-    { key: 'vk', label: 'ВК', color: 'text-blue-400 bg-blue-500/10' },
-    { key: 'threads', label: 'Threads', color: 'text-neutral-300 bg-neutral-500/10' },
-    { key: 'telegram', label: 'Telegram', color: 'text-sky-400 bg-sky-500/10' },
-    { key: 'max', label: 'Макс', color: 'text-cyan-400 bg-cyan-500/10' },
-    { key: 'likee', label: 'Лайки', color: 'text-orange-400 bg-orange-500/10' },
-];
 
 const KPI_METRICS = [
     { key: 'views', label: 'Просмотры' },
@@ -31,32 +21,6 @@ const KPI_METRICS = [
     { key: 'shares', label: 'Репосты' },
     { key: 'saves', label: 'Сохранения' },
 ];
-
-const formatNumber = (n: number) => {
-    if (!n) return '0';
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
-    return n.toString();
-};
-
-const getYouTubeThumbnail = (url: string) => {
-    const m = url.match(/[?&]v=([A-Za-z0-9_-]{11})/) || url.match(/youtu\.be\/([A-Za-z0-9_-]{11})/);
-    return m ? `https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg` : '';
-};
-
-// Get best thumbnail for a project from its assets
-function getProjectThumbnail(project: any): string {
-    if (project.cover_url) return project.cover_url;
-    const assets = project.video_assets || [];
-    for (const a of assets) {
-        if (a.thumbnail_url) return a.thumbnail_url;
-        if (a.video_url?.includes('youtu')) {
-            const t = getYouTubeThumbnail(a.video_url);
-            if (t) return t;
-        }
-    }
-    return '';
-}
 
 export default function AdminPage() {
     const userId = useGlobalStore((s) => s.userId);
@@ -68,11 +32,12 @@ export default function AdminPage() {
     const [projects, setProjects] = useState<any[]>([]);
     const [creators, setCreators] = useState<any[]>([]);
     const [applications, setApplications] = useState<any[]>([]);
+    const [brands, setBrands] = useState<any[]>([]);
 
     // UI states
     const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
     const [showCreateProject, setShowCreateProject] = useState(false);
-    const [newProject, setNewProject] = useState({ title: '', description: '', brand: '', reward: '', deadline: '' });
+    const [newProject, setNewProject] = useState({ title: '', description: '', brand_id: '', reward: '', deadline: '' });
     const [creating, setCreating] = useState(false);
     const [syncingAssetId, setSyncingAssetId] = useState<string | null>(null);
 
@@ -97,13 +62,17 @@ export default function AdminPage() {
             const res = await fetch(`/api/projects?userId=${userId}&mode=admin`);
             const data = await res.json();
             if (res.ok) setProjects(data.projects || []);
-            // Also load creators for assignment dropdown
+            // Load creators for assignment dropdown
             const { data: creatorsData } = await supabase
                 .from('cr_creators')
                 .select('*')
                 .eq('approval_status', 'approved')
                 .order('created_at', { ascending: false });
             setCreators(creatorsData || []);
+            // Load brands
+            const brandsRes = await fetch('/api/brands');
+            const brandsData = await brandsRes.json();
+            if (brandsRes.ok) setBrands(brandsData.brands || []);
         } else if (activeTab === 'creators') {
             const { data } = await supabase.from('cr_creators').select('*').order('created_at', { ascending: false });
             setCreators(data || []);
@@ -123,11 +92,11 @@ export default function AdminPage() {
             const res = await fetch('/api/projects', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'create', ...newProject, userId })
+                body: JSON.stringify({ action: 'create', title: newProject.title, description: newProject.description, brand_id: newProject.brand_id || undefined, reward: newProject.reward, deadline: newProject.deadline, userId })
             });
             if (res.ok) {
                 setShowCreateProject(false);
-                setNewProject({ title: '', description: '', brand: '', reward: '', deadline: '' });
+                setNewProject({ title: '', description: '', brand_id: '', reward: '', deadline: '' });
                 await fetchData();
             }
         } finally { setCreating(false); }
@@ -252,24 +221,30 @@ export default function AdminPage() {
                         const pCreators = project.assignments || [];
                         const totalViews = pAssets.reduce((s: number, a: any) => s + (a.views || 0), 0);
                         const pendingCount = pAssets.filter((a: any) => a.status === 'pending_review').length;
-                        const thumb = getProjectThumbnail(project);
+                        const brandLogo = project.brand_ref?.logo_url;
+                        const thumb = brandLogo || getProjectThumbnail(project);
+                        const brandName = project.brand_ref?.name || project.brand || 'Без бренда';
 
                         return (
                             <div key={project.id} className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden">
                                 <button onClick={() => setExpandedProjectId(isExpanded ? null : project.id)}
                                     className="w-full p-4 flex items-center gap-4 hover:bg-neutral-800/50 transition-colors text-left">
                                     {/* Project thumbnail */}
-                                    <div className="w-12 h-12 rounded-xl bg-neutral-800 overflow-hidden flex items-center justify-center shrink-0 border border-neutral-700">
+                                    <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center shrink-0 border border-neutral-700"
+                                        style={{ backgroundColor: project.brand_ref?.color || '#262626' }}>
                                         {thumb ? (
-                                            <img src={thumb} alt="" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <FolderOpen size={16} className="text-neutral-600" />
-                                        )}
+                                            <img src={thumb} alt="" className="w-full h-full object-contain p-1.5"
+                                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
+                                            />
+                                        ) : null}
+                                        <span className={clsx("text-white font-black text-lg", thumb && "hidden")}>
+                                            {brandName.charAt(0)}
+                                        </span>
                                     </div>
 
                                     <ChevronDown size={14} className={clsx("text-neutral-500 transition-transform shrink-0", !isExpanded && "-rotate-90")} />
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold">{project.brand || 'Без бренда'}</div>
+                                        <div className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold">{brandName}</div>
                                         <div className="font-bold text-white truncate">{project.title || 'Без названия'}</div>
                                     </div>
                                     <div className="hidden md:flex items-center gap-3 text-xs text-neutral-500">
@@ -429,6 +404,11 @@ export default function AdminPage() {
                                                                                 <X size={12} />
                                                                             </button>
                                                                         )}
+                                                                        <button onClick={() => { if (confirm('Удалить видео навсегда?')) handleAssetAction(asset.id, 'delete'); }}
+                                                                            className="p-1.5 bg-neutral-700/30 hover:bg-red-600/40 text-neutral-500 hover:text-red-400 rounded-lg transition-colors"
+                                                                            title="Удалить">
+                                                                            <Trash2 size={12} />
+                                                                        </button>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -565,9 +545,11 @@ export default function AdminPage() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-neutral-400 mb-1">Бренд</label>
-                                <input type="text" value={newProject.brand} onChange={e => setNewProject({...newProject, brand: e.target.value})}
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
-                                    placeholder="Nike" />
+                                <select value={newProject.brand_id} onChange={e => setNewProject({...newProject, brand_id: e.target.value})}
+                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none">
+                                    <option value="">Без бренда</option>
+                                    {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                </select>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-neutral-400 mb-1">Описание</label>

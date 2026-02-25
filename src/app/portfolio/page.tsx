@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useGlobalStore } from '@/store/global';
+import { formatNumber, detectPlatform, getYouTubeThumbnail } from '@/lib/utils';
 
 interface PortfolioItem {
     id: string;
@@ -42,24 +43,6 @@ const PLATFORM_ICONS: Record<string, { icon: any; color: string; label: string }
     tiktok: { icon: PlaySquare, color: 'text-cyan-400', label: 'TikTok' },
     other: { icon: Link, color: 'text-neutral-400', label: 'Другое' },
 };
-
-function formatNumber(n: number): string {
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
-    return n.toString();
-}
-
-function detectPlatform(url: string): string {
-    if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
-    if (url.includes('tiktok.com')) return 'tiktok';
-    if (url.includes('instagram.com')) return 'instagram';
-    return 'other';
-}
-
-function getYouTubeThumbnail(url: string): string {
-    const match = url.match(/[?&]v=([A-Za-z0-9_-]{11})/) || url.match(/youtu\.be\/([A-Za-z0-9_-]{11})/);
-    return match ? `https://i.ytimg.com/vi/${match[1]}/hqdefault.jpg` : '';
-}
 
 export default function PortfolioPage() {
     const userId = useGlobalStore((s) => s.userId);
