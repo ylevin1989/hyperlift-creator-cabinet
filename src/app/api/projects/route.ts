@@ -8,6 +8,7 @@ function detectPlatform(url: string): string {
     if (url.includes('instagram.com')) return 'instagram';
     if (url.includes('vk.com') || url.includes('vk.video')) return 'vk';
     if (url.includes('threads.net')) return 'threads';
+    if (url.includes('t.me') || url.includes('telegram.me') || url.includes('telegram.org')) return 'telegram';
     if (url.includes('likee.video') || url.includes('likee.com')) return 'likee';
     return 'other';
 }

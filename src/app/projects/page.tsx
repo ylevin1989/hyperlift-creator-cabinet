@@ -58,6 +58,7 @@ const PLATFORMS = [
     { key: 'instagram', label: 'Instagram', color: 'text-pink-400 bg-pink-500/10' },
     { key: 'vk', label: 'ВК', color: 'text-blue-400 bg-blue-500/10' },
     { key: 'threads', label: 'Threads', color: 'text-neutral-300 bg-neutral-500/10' },
+    { key: 'telegram', label: 'Telegram', color: 'text-sky-400 bg-sky-500/10' },
     { key: 'max', label: 'Макс', color: 'text-cyan-400 bg-cyan-500/10' },
     { key: 'likee', label: 'Лайки', color: 'text-orange-400 bg-orange-500/10' },
 ];

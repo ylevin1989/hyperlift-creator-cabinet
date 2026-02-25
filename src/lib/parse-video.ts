@@ -257,25 +257,28 @@ async function parseTikTok(url: string): Promise<VideoMetrics> {
 async function parseInstagram(url: string): Promise<VideoMetrics> {
     let result: VideoMetrics = { title: '', views: 0, likes: 0, comments: 0 };
 
-    // Strategy 1: Instagram embed page (no auth needed)
-    // Strategy 1: RapidAPI — most accurate, try first when key is available
+    // When RapidAPI key is available — use ONLY RapidAPI, no fallback
+    // Embed/direct/puppeteer return stale cached data
     const rapidApiKey = process.env.RAPIDAPI_KEY;
     if (rapidApiKey) {
         try {
-            console.log('[IG Parser] Strategy 1: RapidAPI (most accurate)...');
+            console.log('[IG Parser] Using RapidAPI ONLY (most accurate)...');
             result = await parseInstagramRapidAPI(url, rapidApiKey);
-            if (result.views > 0 || result.likes > 0 || result.comments > 0) {
-                console.log('[IG Parser] RapidAPI success:', result);
-                return result;
-            }
+            console.log('[IG Parser] RapidAPI result:', result);
+            // Always return RapidAPI result, even if zeros — it's more trustworthy
+            // than cached embed pages. For photos, views=0 is expected.
+            return result;
         } catch (e) {
-            console.error('[IG Parser] RapidAPI error:', e?.message || e);
+            console.error('[IG Parser] RapidAPI failed:', e?.message || e);
+            // Only fall through to other strategies if RapidAPI itself errors
         }
     }
 
-    // Strategy 2: Embed page (free, but often returns inaccurate data)
+    // Fallback strategies ONLY when no RapidAPI key or RapidAPI request errors
+
+    // Strategy 2: Embed page
     try {
-        console.log('[IG Parser] Strategy 2: Embed page...');
+        console.log('[IG Parser] Fallback: Embed page...');
         result = await parseInstagramEmbed(url);
         if (result.views > 0 || result.likes > 0 || result.comments > 0) {
             console.log('[IG Parser] Embed success:', result);
@@ -285,9 +288,9 @@ async function parseInstagram(url: string): Promise<VideoMetrics> {
         console.error('[IG Parser] Embed error:', e?.message || e);
     }
 
-    // Strategy 3: Direct page fetch (may fail due to login wall)
+    // Strategy 3: Direct page fetch
     try {
-        console.log('[IG Parser] Strategy 3: Direct fetch...');
+        console.log('[IG Parser] Fallback: Direct fetch...');
         result = await parseInstagramDirect(url);
         if (result.views > 0 || result.likes > 0 || result.comments > 0) {
             console.log('[IG Parser] Direct success:', result);
@@ -297,9 +300,10 @@ async function parseInstagram(url: string): Promise<VideoMetrics> {
         console.error('[IG Parser] Direct error:', e?.message || e);
     }
 
-    // Strategy 4: Puppeteer headless browser
+    // Strategy 4: Puppeteer (skip in production — too heavy for Docker)
+    // Only available when puppeteer is installed
     try {
-        console.log('[IG Parser] Strategy 4: Puppeteer...');
+        console.log('[IG Parser] Fallback: Puppeteer...');
         result = await parseInstagramPuppeteer(url);
         if (result.views > 0 || result.likes > 0 || result.comments > 0) {
             console.log('[IG Parser] Puppeteer success:', result);
