@@ -150,7 +150,7 @@ export async function POST(request: Request) {
 
         const platform = manualPlatform || detectPlatform(videoUrl);
 
-        const { data: asset, error: assetError } = await supabase
+        let { data: asset, error: assetError } = await supabase
             .from('cr_video_assets')
             .insert({
                 project_id: projectId,
@@ -170,30 +170,39 @@ export async function POST(request: Request) {
             .update({ updated_at: new Date().toISOString() })
             .eq('id', projectId);
 
-        // Auto-parse video metrics (non-blocking)
+        // Parse video metrics synchronously so frontend gets updated data immediately
         const { parseVideoMetrics } = await import('@/lib/parse-video');
-        (async () => {
-            try {
-                console.log('[Auto-parse] Fetching metrics for:', videoUrl);
-                const metrics = await parseVideoMetrics(videoUrl);
-                if (metrics.title || metrics.views > 0 || metrics.likes > 0) {
-                    const updateData: any = {
-                        title: metrics.title || undefined,
-                        views: metrics.views || undefined,
-                        likes: metrics.likes || undefined,
-                        comments: metrics.comments || undefined,
-                        last_stats_update: new Date().toISOString()
-                    };
-                    if (metrics.thumbnail_url) updateData.thumbnail_url = metrics.thumbnail_url;
-                    // Remove undefined values
-                    Object.keys(updateData).forEach(k => updateData[k] === undefined && delete updateData[k]);
-                    await supabase.from('cr_video_assets').update(updateData).eq('id', asset.id);
-                    console.log('[Auto-parse] Updated:', asset.id, metrics.title, metrics.views);
+        try {
+            console.log('[Auto-parse] Fetching metrics for:', videoUrl);
+            const metrics = await parseVideoMetrics(videoUrl);
+            if (metrics.title || metrics.views > 0 || metrics.likes > 0) {
+                const updateData: any = {
+                    title: metrics.title || undefined,
+                    views: metrics.views || undefined,
+                    likes: metrics.likes || undefined,
+                    comments: metrics.comments || undefined,
+                    last_stats_update: new Date().toISOString()
+                };
+                if (metrics.thumbnail_url) updateData.thumbnail_url = metrics.thumbnail_url;
+                // Remove undefined values
+                Object.keys(updateData).forEach(k => updateData[k] === undefined && delete updateData[k]);
+                
+                // Update in DB
+                const { data: updatedAsset } = await supabase
+                    .from('cr_video_assets')
+                    .update(updateData)
+                    .eq('id', asset.id)
+                    .select()
+                    .single();
+                
+                if (updatedAsset) {
+                    asset = updatedAsset;
                 }
-            } catch (e: any) {
-                console.error('[Auto-parse] Error:', e?.message);
+                console.log('[Auto-parse] Updated:', asset.id, metrics.title, metrics.views);
             }
-        })();
+        } catch (e: any) {
+            console.error('[Auto-parse] Error:', e?.message);
+        }
 
         // Send Telegram notification (non-blocking)
         try {

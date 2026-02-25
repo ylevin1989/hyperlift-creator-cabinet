@@ -15,20 +15,25 @@ export interface VideoMetrics {
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-/**
- * Main entry point — detects platform and routes to the right parser
- */
 export async function parseVideoMetrics(url: string): Promise<VideoMetrics> {
     try {
+        let result: VideoMetrics = { title: '', views: 0, likes: 0, comments: 0 };
         if (url.includes('youtube.com') || url.includes('youtu.be')) {
-            return await parseYouTube(url);
+            result = await parseYouTube(url);
+        } else if (url.includes('tiktok.com')) {
+            result = await parseTikTok(url);
+        } else if (url.includes('instagram.com')) {
+            result = await parseInstagram(url);
         }
-        if (url.includes('tiktok.com')) {
-            return await parseTikTok(url);
-        }
-        if (url.includes('instagram.com')) {
-            return await parseInstagram(url);
-        }
+        
+        // Ensure no NaN values
+        return {
+            title: result.title || '',
+            views: Number.isNaN(result.views) ? 0 : result.views,
+            likes: Number.isNaN(result.likes) ? 0 : result.likes,
+            comments: Number.isNaN(result.comments) ? 0 : result.comments,
+            thumbnail_url: result.thumbnail_url
+        };
     } catch (e: any) {
         console.error('parseVideoMetrics top-level error:', e);
     }

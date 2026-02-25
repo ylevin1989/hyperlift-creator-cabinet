@@ -5,12 +5,12 @@ import {
     Eye, ThumbsUp, MessageCircle, ExternalLink, RefreshCw, Check, X,
     ChevronDown, Plus, Users, FolderOpen, Inbox, Shield,
     Target, Trash2, Video, Loader2, UserCheck, UserX, Clock,
-    BookOpen, Edit3, Save, Image, Type, FileText, ToggleLeft, ToggleRight
+    BookOpen, Edit3, Save, Image, Type, FileText, ToggleLeft, ToggleRight, Upload
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useGlobalStore } from '@/store/global';
 import { supabase } from '@/lib/supabase';
-import { PLATFORMS, formatNumber, getYouTubeThumbnail, getProjectThumbnail } from '@/lib/utils';
+import { PLATFORMS, formatNumber, getYouTubeThumbnail, getProjectThumbnail, transliterate } from '@/lib/utils';
 
 type AdminTab = 'projects' | 'creators' | 'applications' | 'articles';
 
@@ -40,6 +40,7 @@ export default function AdminPage() {
     const [editingArticle, setEditingArticle] = useState<any>(null);
     const [articleForm, setArticleForm] = useState({ title: '', slug: '', excerpt: '', category: 'content', read_time: 5, cover_image: '', content: '', published: true });
     const [savingArticle, setSavingArticle] = useState(false);
+    const [uploadingImage, setUploadingImage] = useState(false);
 
     // UI states
     const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
@@ -235,6 +236,29 @@ export default function AdminPage() {
             body: JSON.stringify({ id: article.id, published: !article.published })
         });
         await fetchArticles();
+    };
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // generate unique name
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const filePath = `articles/${fileName}`;
+
+        setUploadingImage(true);
+        try {
+            const { error: uploadError } = await supabase.storage.from('uploads').upload(filePath, file);
+            if (uploadError) throw uploadError;
+            
+            const { data } = supabase.storage.from('uploads').getPublicUrl(filePath);
+            setArticleForm({ ...articleForm, cover_image: data.publicUrl });
+        } catch (err) {
+            console.error('Error uploading image:', err);
+            alert('Ошибка при загрузке изображения');
+        }
+        setUploadingImage(false);
     };
 
     if (loading) return <div className="p-8 text-neutral-400 animate-pulse text-center">Загрузка...</div>;
@@ -691,7 +715,7 @@ export default function AdminPage() {
                                     <input value={articleForm.title}
                                         onChange={e => {
                                             const title = e.target.value;
-                                            const slug = editingArticle.id ? articleForm.slug : title.toLowerCase().replace(/[^a-zа-яё0-9]+/gi, '-').replace(/^-|-$/g, '');
+                                            const slug = editingArticle.id ? articleForm.slug : transliterate(title).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
                                             setArticleForm({...articleForm, title, slug});
                                         }}
                                         className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
@@ -736,10 +760,16 @@ export default function AdminPage() {
                                 </div>
                                 <div className="col-span-2">
                                     <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">URL обложки</label>
-                                    <input value={articleForm.cover_image}
-                                        onChange={e => setArticleForm({...articleForm, cover_image: e.target.value})}
-                                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none text-sm"
-                                        placeholder="https://images.unsplash.com/..." />
+                                    <div className="flex gap-2">
+                                        <input value={articleForm.cover_image}
+                                            onChange={e => setArticleForm({...articleForm, cover_image: e.target.value})}
+                                            className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none text-sm"
+                                            placeholder="https://images.unsplash.com/..." />
+                                        <label className="bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl px-4 py-3 text-sm font-bold cursor-pointer transition-colors flex items-center justify-center gap-2 shrink-0">
+                                            {uploadingImage ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                                            <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploadingImage} />
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
 

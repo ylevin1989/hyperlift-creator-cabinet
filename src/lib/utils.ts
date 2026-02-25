@@ -18,6 +18,19 @@ export function formatNumber(n: number): string {
     return n.toLocaleString('ru-RU');
 }
 
+export function transliterate(text: string): string {
+    const ru: { [key: string]: string } = {
+        'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 
+        'е': 'e', 'ё': 'e', 'ж': 'zh', 'з': 'zh', 'и': 'i', 
+        'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 
+        'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 
+        'у': 'u', 'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 
+        'ш': 'sh', 'щ': 'sch', 'ъ': 'sch', 'ы': 'y', 'ь': '', 
+        'э': 'e', 'ю': 'yu', 'я': 'ya'
+    };
+    return text.toLowerCase().split('').map(char => ru[char] || char).join('');
+}
+
 export function getYouTubeThumbnail(url: string): string {
     const match = url.match(/[?&]v=([A-Za-z0-9_-]{11})/) || url.match(/youtu\.be\/([A-Za-z0-9_-]{11})/);
     return match ? `https://i.ytimg.com/vi/${match[1]}/hqdefault.jpg` : '';

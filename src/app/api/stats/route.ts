@@ -41,7 +41,7 @@ export async function GET(request: Request) {
         // 3. Fetch Aggregated stats for their videos
         const { data: videos, error: videosErr } = await supabase
             .from('cr_video_assets')
-            .select('id, views, likes, cpv, er, kpi_bonus, thumbnail_url, platform, last_stats_update, title, video_url, project_id')
+            .select('id, views, likes, comments, cpv, er, kpi_bonus, thumbnail_url, platform, last_stats_update, title, video_url, project_id')
             .eq('creator_id', userId)
             .eq('status', 'approved');
 
@@ -60,11 +60,24 @@ export async function GET(request: Request) {
             profile.holding_balance = calcHolding;
         }
 
-        // Calculate aggregated metrics
-        const totalViews = videos?.reduce((acc, curr) => acc + (curr.views || 0), 0) || 0;
-        const avgER = videos?.length
-            ? videos.reduce((acc, curr) => acc + (curr.er || 0), 0) / videos.length
-            : 0;
+        // Calculate aggregated metrics dynamically
+        const videosWithStats = videos?.map(v => {
+            const views = v.views || 0;
+            const likes = v.likes || 0;
+            const comments = v.comments || 0;
+            let er = v.er || 0;
+            if (er === 0 && views > 0) {
+                er = ((likes + comments) / views) * 100;
+            }
+            return { ...v, er: Number(er.toFixed(2)) };
+        }) || [];
+
+        const totalViews = videosWithStats.reduce((acc, curr) => acc + (curr.views || 0), 0);
+        const totalLikes = videosWithStats.reduce((acc, curr) => acc + (curr.likes || 0), 0);
+        const totalComments = videosWithStats.reduce((acc, curr) => acc + (curr.comments || 0), 0);
+        
+        // accurate average ER across all views
+        const avgER = totalViews > 0 ? ((totalLikes + totalComments) / totalViews) * 100 : 0;
 
         return NextResponse.json({
             profile,
@@ -74,7 +87,7 @@ export async function GET(request: Request) {
                 totalVideos: videos?.length || 0,
                 totalKpi
             },
-            videos: videos || []
+            videos: videosWithStats
         });
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 500 });
