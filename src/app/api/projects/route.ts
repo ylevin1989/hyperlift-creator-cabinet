@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { notifyNewVideo } from '@/lib/telegram-notify';
 
 // Helper: detect platform from URL
 function detectPlatform(url: string): string {
@@ -170,6 +171,19 @@ export async function POST(request: Request) {
             .from('cr_projects')
             .update({ updated_at: new Date().toISOString() })
             .eq('id', projectId);
+
+        // Send Telegram notification (non-blocking)
+        try {
+            const { data: creator } = await supabase.from('cr_creators').select('full_name, username').eq('id', userId).single();
+            const { data: project } = await supabase.from('cr_projects').select('title, brand').eq('id', projectId).single();
+            notifyNewVideo({
+                creatorName: creator?.full_name || creator?.username || 'Unknown',
+                projectTitle: project?.title || project?.brand || 'Без названия',
+                videoUrl: videoUrl,
+                platform,
+                projectId,
+            }).catch(() => {}); // fire-and-forget
+        } catch (e) { /* ignore notification errors */ }
 
         return NextResponse.json({ success: true, asset });
     } catch (err: any) {

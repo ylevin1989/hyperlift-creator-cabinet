@@ -44,6 +44,7 @@ interface Project {
     title?: string;
     brand?: string;
     description?: string;
+    cover_url?: string;
     status: string;
     reward: string;
     deadline?: string;
@@ -179,6 +180,21 @@ export default function ProjectsPage() {
                                 onClick={() => toggleProject(project.id)}
                                 className="w-full p-4 flex items-center gap-4 hover:bg-neutral-800/50 transition-colors text-left"
                             >
+                                {/* Project thumbnail */}
+                                {(() => {
+                                    const thumb = project.cover_url || assets.find(a => a.thumbnail_url)?.thumbnail_url ||
+                                        (assets.find(a => a.video_url?.includes('youtu'))?.video_url ? getYouTubeThumbnail(assets.find(a => a.video_url?.includes('youtu'))!.video_url) : '');
+                                    return (
+                                        <div className="w-12 h-12 rounded-xl bg-neutral-800 overflow-hidden flex items-center justify-center shrink-0 border border-neutral-700">
+                                            {thumb ? (
+                                                <img src={thumb} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <PlaySquare size={16} className="text-neutral-600" />
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+
                                 {/* Expand icon */}
                                 <div className="shrink-0 text-neutral-500 transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
                                     <ChevronDown size={18} />

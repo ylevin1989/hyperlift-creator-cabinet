@@ -4,13 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import {
     Eye, ThumbsUp, MessageCircle, ExternalLink, RefreshCw, Check, X,
     ChevronDown, Plus, Users, FolderOpen, Inbox, Shield,
-    Target, Trash2, UserPlus, Video, Loader2
+    Target, Trash2, Video, Loader2, UserCheck, UserX, Clock
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useGlobalStore } from '@/store/global';
 import { supabase } from '@/lib/supabase';
 
-type AdminTab = 'projects' | 'creators' | 'applications' | 'moderation';
+type AdminTab = 'projects' | 'creators' | 'applications';
 
 const PLATFORMS = [
     { key: 'youtube', label: 'YouTube', color: 'text-red-400 bg-red-500/10' },
@@ -44,6 +44,20 @@ const getYouTubeThumbnail = (url: string) => {
     return m ? `https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg` : '';
 };
 
+// Get best thumbnail for a project from its assets
+function getProjectThumbnail(project: any): string {
+    if (project.cover_url) return project.cover_url;
+    const assets = project.video_assets || [];
+    for (const a of assets) {
+        if (a.thumbnail_url) return a.thumbnail_url;
+        if (a.video_url?.includes('youtu')) {
+            const t = getYouTubeThumbnail(a.video_url);
+            if (t) return t;
+        }
+    }
+    return '';
+}
+
 export default function AdminPage() {
     const userId = useGlobalStore((s) => s.userId);
     const [authorized, setAuthorized] = useState(false);
@@ -54,13 +68,13 @@ export default function AdminPage() {
     const [projects, setProjects] = useState<any[]>([]);
     const [creators, setCreators] = useState<any[]>([]);
     const [applications, setApplications] = useState<any[]>([]);
-    const [assets, setAssets] = useState<any[]>([]);
 
     // UI states
     const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
     const [showCreateProject, setShowCreateProject] = useState(false);
     const [newProject, setNewProject] = useState({ title: '', description: '', brand: '', reward: '', deadline: '' });
     const [creating, setCreating] = useState(false);
+    const [syncingAssetId, setSyncingAssetId] = useState<string | null>(null);
 
     // KPI form
     const [kpiForm, setKpiForm] = useState({ creatorId: '', metric: 'views', rate: '', target: '' });
@@ -83,6 +97,13 @@ export default function AdminPage() {
             const res = await fetch(`/api/projects?userId=${userId}&mode=admin`);
             const data = await res.json();
             if (res.ok) setProjects(data.projects || []);
+            // Also load creators for assignment dropdown
+            const { data: creatorsData } = await supabase
+                .from('cr_creators')
+                .select('*')
+                .eq('approval_status', 'approved')
+                .order('created_at', { ascending: false });
+            setCreators(creatorsData || []);
         } else if (activeTab === 'creators') {
             const { data } = await supabase.from('cr_creators').select('*').order('created_at', { ascending: false });
             setCreators(data || []);
@@ -90,10 +111,6 @@ export default function AdminPage() {
             const res = await fetch(`/api/applications?userId=${userId}`);
             const data = await res.json();
             if (res.ok) setApplications(data.applications || []);
-        } else if (activeTab === 'moderation') {
-            const res = await fetch(`/api/admin/assets?userId=${userId}`);
-            const data = await res.json();
-            if (res.ok) setAssets(data.assets || []);
         }
     }, [userId, authorized, activeTab]);
 
@@ -161,23 +178,35 @@ export default function AdminPage() {
         await fetchData();
     };
 
-    const handleAssetAction = async (assetId: string, action: string, body?: any) => {
+    // Video moderation actions (now inside projects)
+    const handleAssetAction = async (assetId: string, action: string) => {
+        if (action === 'sync') setSyncingAssetId(assetId);
         await fetch(`/api/admin/assets?userId=${userId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ assetId, action, ...body })
+            body: JSON.stringify({ assetId, action })
         });
+        setSyncingAssetId(null);
+        await fetchData();
+    };
+
+    // Creator approval actions
+    const handleCreatorApproval = async (creatorId: string, status: 'approved' | 'blocked') => {
+        await supabase.from('cr_creators').update({ approval_status: status }).eq('id', creatorId);
         await fetchData();
     };
 
     if (loading) return <div className="p-8 text-neutral-400 animate-pulse text-center">Загрузка...</div>;
     if (!authorized) return <div className="p-8 text-red-400 text-center">Доступ запрещён</div>;
 
+    const pendingCreators = creators.filter(c => c.approval_status === 'pending');
+    const pendingApps = applications.filter(a => a.status === 'pending');
+    const pendingVideos = projects.reduce((sum, p) => sum + (p.video_assets || []).filter((a: any) => a.status === 'pending_review').length, 0);
+
     const TABS: { key: AdminTab; label: string; icon: any; count?: number }[] = [
-        { key: 'projects', label: 'Проекты', icon: FolderOpen, count: projects.length },
-        { key: 'creators', label: 'Креаторы', icon: Users, count: creators.length },
-        { key: 'applications', label: 'Заявки', icon: Inbox, count: applications.filter(a => a.status === 'pending').length },
-        { key: 'moderation', label: 'Модерация', icon: Shield, count: assets.filter(a => a.status === 'pending_review').length },
+        { key: 'projects', label: 'Проекты', icon: FolderOpen, count: pendingVideos > 0 ? pendingVideos : undefined },
+        { key: 'creators', label: 'Креаторы', icon: Users, count: pendingCreators.length > 0 ? pendingCreators.length : undefined },
+        { key: 'applications', label: 'Заявки', icon: Inbox, count: pendingApps.length > 0 ? pendingApps.length : undefined },
     ];
 
     return (
@@ -207,8 +236,8 @@ export default function AdminPage() {
                     >
                         <tab.icon size={16} />
                         <span className="hidden sm:inline">{tab.label}</span>
-                        {tab.count !== undefined && tab.count > 0 && (
-                            <span className="text-[10px] bg-neutral-700 text-neutral-300 px-1.5 py-0.5 rounded-full">{tab.count}</span>
+                        {tab.count !== undefined && (
+                            <span className="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold animate-pulse">{tab.count}</span>
                         )}
                     </button>
                 ))}
@@ -222,21 +251,37 @@ export default function AdminPage() {
                         const pAssets = project.video_assets || [];
                         const pCreators = project.assignments || [];
                         const totalViews = pAssets.reduce((s: number, a: any) => s + (a.views || 0), 0);
+                        const pendingCount = pAssets.filter((a: any) => a.status === 'pending_review').length;
+                        const thumb = getProjectThumbnail(project);
 
                         return (
                             <div key={project.id} className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden">
                                 <button onClick={() => setExpandedProjectId(isExpanded ? null : project.id)}
                                     className="w-full p-4 flex items-center gap-4 hover:bg-neutral-800/50 transition-colors text-left">
-                                    <ChevronDown size={16} className={clsx("text-neutral-500 transition-transform", !isExpanded && "-rotate-90")} />
+                                    {/* Project thumbnail */}
+                                    <div className="w-12 h-12 rounded-xl bg-neutral-800 overflow-hidden flex items-center justify-center shrink-0 border border-neutral-700">
+                                        {thumb ? (
+                                            <img src={thumb} alt="" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <FolderOpen size={16} className="text-neutral-600" />
+                                        )}
+                                    </div>
+
+                                    <ChevronDown size={14} className={clsx("text-neutral-500 transition-transform shrink-0", !isExpanded && "-rotate-90")} />
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-xs text-neutral-500 uppercase tracking-widest font-bold">{project.brand || 'Без бренда'}</div>
+                                        <div className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold">{project.brand || 'Без бренда'}</div>
                                         <div className="font-bold text-white truncate">{project.title || 'Без названия'}</div>
                                     </div>
-                                    <div className="flex items-center gap-3 text-xs text-neutral-500">
+                                    <div className="hidden md:flex items-center gap-3 text-xs text-neutral-500">
                                         <span className="flex items-center gap-1"><Users size={12} /> {pCreators.length}</span>
                                         <span className="flex items-center gap-1"><Video size={12} /> {pAssets.length}</span>
                                         <span className="flex items-center gap-1"><Eye size={12} /> {formatNumber(totalViews)}</span>
                                     </div>
+                                    {pendingCount > 0 && (
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 animate-pulse">
+                                            ⏳ {pendingCount}
+                                        </span>
+                                    )}
                                     <span className={clsx("text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap",
                                         project.status === 'Закрыто' ? 'text-neutral-500 bg-neutral-800/10 border-neutral-700/20' : 'text-blue-400 bg-blue-500/10 border-blue-500/20'
                                     )}>{project.status}</span>
@@ -249,9 +294,7 @@ export default function AdminPage() {
 
                                         {/* Assigned Creators */}
                                         <div>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Креаторы</h4>
-                                            </div>
+                                            <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Креаторы</h4>
                                             <div className="space-y-2">
                                                 {pCreators.map((a: any) => (
                                                     <div key={a.id} className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 flex items-center gap-3">
@@ -264,24 +307,16 @@ export default function AdminPage() {
                                                         <button onClick={() => removeCreator(project.id, a.creator_id)} className="text-red-400 hover:text-red-300 p-1"><Trash2 size={14} /></button>
                                                     </div>
                                                 ))}
-
-                                                {/* Add creator dropdown */}
-                                                <div className="flex gap-2">
-                                                    <select
-                                                        className="flex-1 bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-sm text-white"
-                                                        value=""
-                                                        onChange={async (e) => {
-                                                            if (e.target.value) {
-                                                                await assignCreator(project.id, e.target.value);
-                                                            }
-                                                        }}
-                                                    >
-                                                        <option value="">+ Назначить креатора...</option>
-                                                        {creators.filter(c => !pCreators.some((a: any) => a.creator_id === c.id) && c.role !== 'admin').map(c => (
-                                                            <option key={c.id} value={c.id}>{c.full_name || c.username}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
+                                                <select
+                                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-sm text-white"
+                                                    value=""
+                                                    onChange={async (e) => { if (e.target.value) await assignCreator(project.id, e.target.value); }}
+                                                >
+                                                    <option value="">+ Назначить креатора...</option>
+                                                    {creators.filter(c => !pCreators.some((a: any) => a.creator_id === c.id) && c.role !== 'admin').map(c => (
+                                                        <option key={c.id} value={c.id}>{c.full_name || c.username}</option>
+                                                    ))}
+                                                </select>
                                             </div>
                                         </div>
 
@@ -313,37 +348,92 @@ export default function AdminPage() {
                                             </div>
                                         )}
 
-                                        {/* Videos summary */}
+                                        {/* ====== VIDEOS WITH MODERATION ====== */}
                                         {pAssets.length > 0 && (
                                             <div>
-                                                <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Материалы ({pAssets.length})</h4>
-                                                <div className="space-y-1.5">
-                                                    {pAssets.slice(0, 5).map((a: any) => {
-                                                        const plat = PLATFORMS.find(p => p.key === a.platform);
-                                                        const thumb = a.thumbnail_url || (a.video_url?.includes('youtu') ? getYouTubeThumbnail(a.video_url) : '');
+                                                <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">
+                                                    Материалы ({pAssets.length})
+                                                    {pendingCount > 0 && <span className="text-orange-400 ml-1">• {pendingCount} на проверке</span>}
+                                                </h4>
+                                                <div className="space-y-2">
+                                                    {pAssets.map((asset: any) => {
+                                                        const plat = PLATFORMS.find(p => p.key === asset.platform);
+                                                        const thumb = asset.thumbnail_url || (asset.video_url?.includes('youtu') ? getYouTubeThumbnail(asset.video_url) : '');
+                                                        const isPending = asset.status === 'pending_review';
+                                                        const isSyncing = syncingAssetId === asset.id;
+
+                                                        // Find creator for this asset
+                                                        const assetCreator = pCreators.find((a: any) => a.creator_id === asset.creator_id);
+
                                                         return (
-                                                            <div key={a.id} className="bg-neutral-950 border border-neutral-800 rounded-lg p-2 flex items-center gap-2 text-xs">
-                                                                <div className="w-14 aspect-video bg-neutral-900 rounded overflow-hidden flex items-center justify-center shrink-0">
-                                                                    {thumb ? <img src={thumb} className="w-full h-full object-cover" /> : <Video size={12} className="text-neutral-700" />}
-                                                                </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="text-white truncate font-medium">{a.title || 'Без названия'}</div>
-                                                                    <div className="flex items-center gap-2 text-neutral-500">
-                                                                        {plat && <span className={clsx("text-[9px] px-1 rounded-full", plat.color)}>{plat.label}</span>}
-                                                                        <span className="flex items-center gap-0.5"><Eye size={8} /> {formatNumber(a.views)}</span>
-                                                                        <span className="flex items-center gap-0.5"><ThumbsUp size={8} /> {formatNumber(a.likes)}</span>
+                                                            <div key={asset.id} className={clsx(
+                                                                "bg-neutral-950 border rounded-xl p-3 transition-all",
+                                                                isPending ? "border-orange-500/30 ring-1 ring-orange-500/10" : "border-neutral-800"
+                                                            )}>
+                                                                <div className="flex gap-3 items-start">
+                                                                    {/* Thumbnail */}
+                                                                    <div className="w-20 aspect-video bg-neutral-900 rounded-lg overflow-hidden flex items-center justify-center shrink-0 border border-neutral-800">
+                                                                        {thumb ? <img src={thumb} className="w-full h-full object-cover" /> : <Video size={14} className="text-neutral-700" />}
+                                                                    </div>
+
+                                                                    {/* Info */}
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="font-medium text-white text-sm truncate mb-0.5">{asset.title || 'Без названия'}</div>
+                                                                        <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                                                                            <a href={asset.video_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-[10px] flex items-center gap-0.5">
+                                                                                <ExternalLink size={8} /> Ссылка
+                                                                            </a>
+                                                                            {plat && <span className={clsx("text-[10px] font-bold px-1.5 py-0.5 rounded-full", plat.color)}>{plat.label}</span>}
+                                                                            {assetCreator && (
+                                                                                <span className="text-[10px] text-neutral-500">
+                                                                                    👤 {assetCreator.creator?.full_name || '—'}
+                                                                                </span>
+                                                                            )}
+                                                                            <span className={clsx("text-[10px] font-bold px-1.5 py-0.5 rounded-full border",
+                                                                                asset.status === 'approved' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                                                                asset.status === 'rejected' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                                                'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                                                                            )}>
+                                                                                {asset.status === 'approved' ? '✓ Одобрено' : asset.status === 'rejected' ? '✗ Отклонено' : '⏳ На проверке'}
+                                                                            </span>
+                                                                        </div>
+
+                                                                        {/* Metrics row */}
+                                                                        <div className="flex items-center gap-3 text-xs text-neutral-400">
+                                                                            <span className="flex items-center gap-0.5"><Eye size={10} /> {formatNumber(asset.views)}</span>
+                                                                            <span className="flex items-center gap-0.5"><ThumbsUp size={10} /> {formatNumber(asset.likes)}</span>
+                                                                            <span className="flex items-center gap-0.5"><MessageCircle size={10} /> {formatNumber(asset.comments)}</span>
+                                                                            {asset.kpi_bonus > 0 && <span className="text-green-400 font-bold">+{asset.kpi_bonus}₽</span>}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Action buttons */}
+                                                                    <div className="flex flex-col gap-1 shrink-0">
+                                                                        <button onClick={() => handleAssetAction(asset.id, 'sync')}
+                                                                            disabled={isSyncing}
+                                                                            className="p-1.5 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 rounded-lg transition-colors"
+                                                                            title="Sync метрики">
+                                                                            <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
+                                                                        </button>
+                                                                        {asset.status !== 'approved' && (
+                                                                            <button onClick={() => handleAssetAction(asset.id, 'approve')}
+                                                                                className="p-1.5 bg-green-600/20 hover:bg-green-600/40 text-green-400 rounded-lg transition-colors"
+                                                                                title="Одобрить">
+                                                                                <Check size={12} />
+                                                                            </button>
+                                                                        )}
+                                                                        {asset.status !== 'rejected' && (
+                                                                            <button onClick={() => handleAssetAction(asset.id, 'reject')}
+                                                                                className="p-1.5 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg transition-colors"
+                                                                                title="Отклонить">
+                                                                                <X size={12} />
+                                                                            </button>
+                                                                        )}
                                                                     </div>
                                                                 </div>
-                                                                <span className={clsx("text-[9px] font-bold px-1.5 py-0.5 rounded-full border shrink-0",
-                                                                    a.status === 'approved' ? 'text-green-400 border-green-500/20' :
-                                                                    a.status === 'rejected' ? 'text-red-400 border-red-500/20' : 'text-orange-400 border-orange-500/20'
-                                                                )}>
-                                                                    {a.status === 'approved' ? '✓' : a.status === 'rejected' ? '✗' : '⏳'}
-                                                                </span>
                                                             </div>
                                                         );
                                                     })}
-                                                    {pAssets.length > 5 && <div className="text-xs text-neutral-500 text-center py-1">+ещё {pAssets.length - 5}</div>}
                                                 </div>
                                             </div>
                                         )}
@@ -359,7 +449,41 @@ export default function AdminPage() {
             {/* ====== CREATORS TAB ====== */}
             {activeTab === 'creators' && (
                 <div className="space-y-2">
-                    {creators.map(c => (
+                    {/* Pending approval section */}
+                    {pendingCreators.length > 0 && (
+                        <div className="mb-4">
+                            <h3 className="text-xs font-bold text-orange-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                <Clock size={12} /> Ожидают одобрения ({pendingCreators.length})
+                            </h3>
+                            <div className="space-y-2">
+                                {pendingCreators.map(c => (
+                                    <div key={c.id} className="bg-neutral-900 border border-orange-500/20 rounded-xl p-4 flex items-center gap-4 ring-1 ring-orange-500/10">
+                                        <div className="w-10 h-10 rounded-full bg-neutral-800 overflow-hidden flex items-center justify-center font-bold text-sm text-white shrink-0">
+                                            {c.avatar_url ? <img src={c.avatar_url} className="w-full h-full object-cover" /> : c.full_name?.charAt(0) || '?'}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-bold text-white">{c.full_name || c.username || '—'}</div>
+                                            <div className="text-xs text-neutral-500">@{c.username || '—'} • {new Date(c.created_at).toLocaleDateString('ru-RU')}</div>
+                                        </div>
+                                        <div className="flex gap-2 shrink-0">
+                                            <button onClick={() => handleCreatorApproval(c.id, 'approved')}
+                                                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg flex items-center gap-1">
+                                                <UserCheck size={12} /> Одобрить
+                                            </button>
+                                            <button onClick={() => handleCreatorApproval(c.id, 'blocked')}
+                                                className="px-3 py-1.5 bg-red-600/80 hover:bg-red-700 text-white text-xs font-bold rounded-lg flex items-center gap-1">
+                                                <UserX size={12} /> Откл.
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* All creators */}
+                    <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Все креаторы</h3>
+                    {creators.filter(c => c.approval_status !== 'pending').map(c => (
                         <div key={c.id} className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex items-center gap-4">
                             <div className="w-10 h-10 rounded-full bg-neutral-800 overflow-hidden flex items-center justify-center font-bold text-sm text-white shrink-0">
                                 {c.avatar_url ? <img src={c.avatar_url} className="w-full h-full object-cover" /> : c.full_name?.charAt(0) || '?'}
@@ -368,7 +492,21 @@ export default function AdminPage() {
                                 <div className="font-bold text-white">{c.full_name || c.username || '—'}</div>
                                 <div className="text-xs text-neutral-500">@{c.username || '—'} • {c.role || 'creator'}</div>
                             </div>
-                            <div className="text-xs text-neutral-500">{new Date(c.created_at).toLocaleDateString('ru-RU')}</div>
+                            <span className={clsx("text-[10px] font-bold px-2 py-0.5 rounded-full border",
+                                c.approval_status === 'approved' ? 'text-green-400 border-green-500/20 bg-green-500/10' :
+                                c.approval_status === 'blocked' ? 'text-red-400 border-red-500/20 bg-red-500/10' :
+                                'text-orange-400 border-orange-500/20 bg-orange-500/10'
+                            )}>
+                                {c.approval_status === 'approved' ? '✓ Активен' : c.approval_status === 'blocked' ? '✗ Заблокирован' : '⏳'}
+                            </span>
+                            {c.approval_status === 'blocked' && (
+                                <button onClick={() => handleCreatorApproval(c.id, 'approved')}
+                                    className="text-xs text-blue-400 hover:text-blue-300 underline">Разблокировать</button>
+                            )}
+                            {c.approval_status === 'approved' && c.role !== 'admin' && (
+                                <button onClick={() => handleCreatorApproval(c.id, 'blocked')}
+                                    className="text-xs text-red-400 hover:text-red-300">Блок</button>
+                            )}
                         </div>
                     ))}
                     {creators.length === 0 && <div className="text-center py-8 text-neutral-600">Нет креаторов</div>}
@@ -410,79 +548,6 @@ export default function AdminPage() {
                         </div>
                     ))}
                     {applications.length === 0 && <div className="text-center py-8 text-neutral-600">Нет заявок</div>}
-                </div>
-            )}
-
-            {/* ====== MODERATION TAB ====== */}
-            {activeTab === 'moderation' && (
-                <div className="space-y-3">
-                    {assets.map((asset: any) => {
-                        const plat = PLATFORMS.find(p => p.key === asset.platform);
-                        const thumb = asset.thumbnail_url || (asset.video_url?.includes('youtu') ? getYouTubeThumbnail(asset.video_url) : '');
-
-                        return (
-                            <div key={asset.id} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 space-y-3">
-                                {/* Creator + status */}
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-neutral-800 overflow-hidden flex items-center justify-center font-bold text-xs text-white shrink-0">
-                                            {asset.creator?.avatar_url ? <img src={asset.creator.avatar_url} className="w-full h-full object-cover" /> : asset.creator?.full_name?.charAt(0) || '?'}
-                                        </div>
-                                        <span className="text-sm font-medium text-white">{asset.creator?.full_name || '—'}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {plat && <span className={clsx("text-[10px] font-bold px-2 py-0.5 rounded-full", plat.color)}>{plat.label}</span>}
-                                        <span className={clsx("text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                                            asset.status === 'approved' ? 'text-green-400 border-green-500/20 bg-green-500/10' :
-                                            asset.status === 'rejected' ? 'text-red-400 border-red-500/20 bg-red-500/10' :
-                                            'text-orange-400 border-orange-500/20 bg-orange-500/10'
-                                        )}>
-                                            {asset.status === 'approved' ? '✓ ОК' : asset.status === 'rejected' ? '✗ Откл.' : '⏳ Проверка'}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Thumbnail + video */}
-                                <div className="flex gap-3 items-center">
-                                    <div className="w-24 aspect-video bg-neutral-950 rounded-lg overflow-hidden flex items-center justify-center shrink-0 border border-neutral-800">
-                                        {thumb ? <img src={thumb} className="w-full h-full object-cover" /> : <Eye size={16} className="text-neutral-700" />}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="font-medium text-white text-sm mb-1 line-clamp-2">{asset.title || 'Без названия'}</div>
-                                        <a href={asset.video_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-xs flex items-center gap-1 truncate">
-                                            <ExternalLink size={10} /> <span className="truncate">{asset.video_url?.replace(/^https?:\/\/(www\.)?/, '')}</span>
-                                        </a>
-                                    </div>
-                                </div>
-
-                                {/* Metrics */}
-                                <div className="grid grid-cols-4 gap-2">
-                                    <div className="bg-neutral-950 rounded-lg p-2 text-center"><div className="text-[9px] text-neutral-500 mb-0.5">Просмотры</div><div className="text-sm font-bold text-white">{formatNumber(asset.views)}</div></div>
-                                    <div className="bg-neutral-950 rounded-lg p-2 text-center"><div className="text-[9px] text-neutral-500 mb-0.5">Лайки</div><div className="text-sm font-bold text-white">{formatNumber(asset.likes)}</div></div>
-                                    <div className="bg-neutral-950 rounded-lg p-2 text-center"><div className="text-[9px] text-neutral-500 mb-0.5">Комменты</div><div className="text-sm font-bold text-white">{formatNumber(asset.comments)}</div></div>
-                                    <div className="bg-neutral-950 rounded-lg p-2 text-center border border-green-500/20"><div className="text-[9px] text-green-500 mb-0.5">KPI</div><div className="text-sm font-bold text-green-400">+{asset.kpi_bonus || 0}₽</div></div>
-                                </div>
-
-                                {/* Actions */}
-                                <div className="flex gap-2">
-                                    <button onClick={() => handleAssetAction(asset.id, 'sync')} className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1">
-                                        <RefreshCw size={12} /> Sync
-                                    </button>
-                                    {asset.status !== 'approved' && (
-                                        <button onClick={() => handleAssetAction(asset.id, 'approve')} className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1">
-                                            <Check size={12} /> ОК
-                                        </button>
-                                    )}
-                                    {asset.status !== 'rejected' && (
-                                        <button onClick={() => handleAssetAction(asset.id, 'reject')} className="flex-1 py-2 bg-red-600/80 hover:bg-red-700 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1">
-                                            <X size={12} /> Откл.
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
-                    {assets.length === 0 && <div className="text-center py-8 text-neutral-600">Нет видео для модерации</div>}
                 </div>
             )}
 
