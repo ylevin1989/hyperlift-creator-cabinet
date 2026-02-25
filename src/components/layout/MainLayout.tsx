@@ -9,8 +9,8 @@ import { supabase } from '@/lib/supabase';
 
 const NAV_ITEMS = [
     { key: 'dashboard', label: 'Сводка', icon: Home, path: '/dashboard' },
-    { key: 'briefs', label: 'Кастинг', icon: BriefcaseBusiness, path: '/briefs' },
-    { key: 'projects', label: 'Проекты', icon: ListTodo, path: '/projects' },
+    { key: 'briefs', label: 'Текущие проекты', icon: BriefcaseBusiness, path: '/briefs' },
+    { key: 'projects', label: 'Мои проекты', icon: ListTodo, path: '/projects' },
     { key: 'stats', label: 'Статистика', icon: BarChart3, path: '/stats' },
     { key: 'finances', label: 'Финансы', icon: Wallet, path: '/finances' },
     { key: 'profile', label: 'Профиль', icon: User, path: '/profile' },

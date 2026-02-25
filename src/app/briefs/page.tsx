@@ -97,7 +97,7 @@ export default function BriefsPage() {
             {/* Header */}
             <div className="pt-2">
                 <h1 className="text-3xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400">
-                    Кастинг
+                    Текущие проекты
                 </h1>
                 <p className="text-neutral-500 font-medium mt-1">Откликайся на брифы и зарабатывай.</p>
             </div>

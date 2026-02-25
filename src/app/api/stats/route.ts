@@ -32,15 +32,16 @@ export async function GET(request: Request) {
         assignments?.forEach(a => {
             const p: any = a.project;
             if (p && validStatuses.includes(p.status)) {
-                if (p.status === 'Модерация' || p.status === 'Опубликовано') calcHolding += (p.reward || 0);
-                else calcAvailable += (p.reward || 0);
+                const rewardVal = parseFloat(p.reward) || 0;
+                if (p.status === 'Модерация' || p.status === 'Опубликовано') calcHolding += rewardVal;
+                else calcAvailable += rewardVal;
             }
         });
 
         // 3. Fetch Aggregated stats for their videos
         const { data: videos, error: videosErr } = await supabase
             .from('cr_video_assets')
-            .select('views, likes, cpv, er, kpi_bonus')
+            .select('id, views, likes, cpv, er, kpi_bonus, thumbnail_url, platform, last_stats_update, title, video_url, project_id')
             .eq('creator_id', userId)
             .eq('status', 'approved');
 
@@ -49,8 +50,9 @@ export async function GET(request: Request) {
         // Add matching KPIs to available balance
         let totalKpi = 0;
         videos?.forEach(v => {
-            calcAvailable += (v.kpi_bonus || 0);
-            totalKpi += (v.kpi_bonus || 0);
+            const kpiBonus = parseFloat(v.kpi_bonus) || 0;
+            calcAvailable += kpiBonus;
+            totalKpi += kpiBonus;
         });
 
         if (profile) {

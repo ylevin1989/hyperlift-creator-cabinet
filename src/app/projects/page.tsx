@@ -374,7 +374,7 @@ export default function ProjectsPage() {
                 <div className="text-center py-16 text-neutral-600">
                     <Video size={48} className="mx-auto mb-4 opacity-50" />
                     <p className="text-lg font-medium">Нет назначенных проектов</p>
-                    <p className="text-sm mt-1">Подайте заявку в разделе «Кастинг» или дождитесь назначения администратором.</p>
+                    <p className="text-sm mt-1">Подайте заявку в разделе «Текущие проекты» или дождитесь назначения администратором.</p>
                 </div>
             )}
         </div>

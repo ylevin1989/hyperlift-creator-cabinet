@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Flexbox } from '@lobehub/ui';
 import { useGlobalStore } from '@/store/global';
+import { PLATFORMS, detectPlatform, getYouTubeThumbnail } from '@/lib/utils';
 
 interface VideoStat {
     id: string;
@@ -22,6 +23,9 @@ interface VideoStat {
     cpv: number;
     er: number;
     created_at: string;
+    thumbnail_url?: string;
+    platform?: string;
+    title?: string;
 }
 
 interface StatsData {
@@ -42,6 +46,7 @@ export default function StatsPage() {
     const userId = useGlobalStore((s) => s.userId);
     const [data, setData] = useState<StatsData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'videos' | 'instagram' | 'posts'>('videos');
 
     useEffect(() => {
         if (!userId) return;
@@ -66,6 +71,14 @@ export default function StatsPage() {
     if (!data) {
         return <div className="p-8 text-red-400 text-center">Ошибка загрузки статистики</div>;
     }
+
+    const displayedVideos = data.videos.filter(v => {
+        const plat = v.platform || detectPlatform(v.video_url);
+        if (activeTab === 'videos') return ['youtube', 'tiktok', 'likee', 'max'].includes(plat);
+        if (activeTab === 'instagram') return plat === 'instagram';
+        if (activeTab === 'posts') return ['telegram', 'vk', 'threads'].includes(plat);
+        return false;
+    });
 
     return (
         <div className="flex flex-col gap-8 animate-fade-in pb-8">
@@ -132,42 +145,73 @@ export default function StatsPage() {
 
             {/* Top Videos */}
             <div>
-                <h2 className="text-xl font-bold text-white mb-4">Детализация по роликам</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                    <h2 className="text-xl font-bold text-white">Детализация по материалам</h2>
+                    <div className="flex bg-neutral-900 p-1 rounded-xl">
+                        {['videos', 'instagram', 'posts'].map(tabKey => (
+                            <button
+                                key={tabKey}
+                                onClick={() => setActiveTab(tabKey as any)}
+                                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === tabKey ? 'bg-neutral-800 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
+                            >
+                                {tabKey === 'videos' ? 'Видеоролики' : tabKey === 'instagram' ? 'Instagram' : 'Текстовые посты'}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 <div className="flex flex-col gap-3">
-                    {data.videos.length === 0 ? (
-                        <div className="text-neutral-500 text-sm">Нет утвержденных роликов с собранной статистикой.</div>
-                    ) : data.videos.map(video => (
+                    {displayedVideos.length === 0 ? (
+                        <div className="text-neutral-500 text-sm py-4 text-center">Нет материалов в этой категории.</div>
+                    ) : displayedVideos.map(video => {
+                        const plat = PLATFORMS.find(p => p.key === (video.platform || detectPlatform(video.video_url)));
+                        const thumb = video.thumbnail_url || (video.video_url?.includes('youtu') ? getYouTubeThumbnail(video.video_url) : '');
+                        return (
                         <div key={video.id} className="bg-neutral-900 border border-neutral-800 p-4 rounded-2xl flex flex-col md:flex-row gap-4 items-center">
-                            <div className="w-16 h-16 rounded-xl bg-neutral-800 flex items-center justify-center shrink-0">
-                                <Share2 className="text-neutral-500" />
-                            </div>
+                            {/* Thumbnail */}
+                            <a href={video.video_url} target="_blank" rel="noreferrer" className="w-full md:w-32 aspect-video bg-neutral-800 rounded-xl overflow-hidden flex items-center justify-center shrink-0 border border-neutral-700 relative group block">
+                                {thumb ? (
+                                    <img src={thumb} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
+                                    />
+                                ) : null}
+                                <span className={`text-white font-black text-xs ${thumb && 'hidden'}`}>
+                                    {plat?.label || 'Link'}
+                                </span>
+                                {plat && (
+                                    <div className={`absolute top-1 right-1 px-1.5 py-0.5 rounded text-[8px] font-bold ${plat.color} backdrop-blur-md border border-white/10`}>
+                                        {plat.label}
+                                    </div>
+                                )}
+                            </a>
+
                             <div className="flex-1 w-full flex flex-col md:flex-row justify-between md:items-center gap-4">
-                                <div>
-                                    <h3 className="font-bold text-white text-lg truncate max-w-[200px]">{video.video_url}</h3>
+                                <div className="min-w-0">
+                                    <h3 className="font-bold text-white text-sm md:text-base truncate max-w-full md:max-w-[200px]" title={video.title || video.video_url}>{video.title || video.video_url}</h3>
                                     <span className="text-xs text-neutral-500 font-medium">Обновлено: {new Date(video.created_at).toLocaleDateString('ru-RU')}</span>
                                 </div>
 
-                                <div className="flex items-center gap-6 overflow-x-auto hide-scrollbar">
+                                <div className="flex items-center gap-4 md:gap-6 overflow-x-auto hide-scrollbar whitespace-nowrap">
                                     <div>
                                         <div className="text-xs text-neutral-500 font-medium flex items-center gap-1 mb-1"><Eye size={12} /> Просмотры</div>
-                                        <div className="font-bold text-white text-lg">{video.views >= 1000 ? (video.views / 1000).toFixed(1) + 'K' : video.views}</div>
+                                        <div className="font-bold text-white text-base md:text-lg">{video.views >= 1000 ? (video.views / 1000).toFixed(1) + 'K' : video.views}</div>
                                     </div>
                                     <div>
                                         <div className="text-xs text-neutral-500 font-medium flex items-center gap-1 mb-1"><ThumbsUp size={12} /> Лайки</div>
-                                        <div className="font-bold text-white text-lg">{video.likes >= 1000 ? (video.likes / 1000).toFixed(1) + 'K' : video.likes}</div>
+                                        <div className="font-bold text-white text-base md:text-lg">{video.likes >= 1000 ? (video.likes / 1000).toFixed(1) + 'K' : video.likes}</div>
                                     </div>
                                     <div>
                                         <div className="text-xs text-neutral-500 font-medium flex items-center gap-1 mb-1"><Activity size={12} /> ER</div>
-                                        <div className="font-bold text-white text-lg">{video.er}%</div>
+                                        <div className="font-bold text-white text-base md:text-lg">{video.er || 0}%</div>
                                     </div>
                                     <div>
                                         <div className="text-xs text-neutral-500 font-medium flex items-center gap-1 mb-1"><MousePointerClick size={12} /> CPV</div>
-                                        <div className="font-bold text-white text-lg text-green-400">{video.cpv} ₽</div>
+                                        <div className="font-bold text-white text-base md:text-lg text-green-400">{video.cpv || 0} ₽</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    ))}
+                    )})}
                 </div>
             </div>
         </div>

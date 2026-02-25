@@ -32,7 +32,7 @@ export async function GET(request: Request) {
                     brief:cr_briefs(*),
                     brand_ref:cr_brands(id, name, logo_url, color),
                     video_assets:cr_video_assets(id, title, video_url, views, likes, comments, status, platform, thumbnail_url, creator_id, last_stats_update, kpi_bonus),
-                    assignments:cr_project_creators(id, creator_id, status, creator:cr_creators(id, full_name, username, avatar_url))
+                    assignments:cr_project_creators(id, creator_id, status, kpi_metric, kpi_rate, kpi_target, creator:cr_creators(id, full_name, username, avatar_url))
                 `)
                 .order('created_at', { ascending: false });
 

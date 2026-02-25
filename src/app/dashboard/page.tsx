@@ -134,8 +134,8 @@ export default function DashboardPage() {
                     {/* Trust Score */}
                     <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-3xl flex flex-col items-center justify-center text-center">
                         <div className="text-orange-500 mb-1"><Flame size={24} className="drop-shadow-[0_0_10px_rgba(249,115,22,0.5)] fill-orange-500/20" /></div>
-                        <p className="text-2xl font-black text-white">{stats.profile?.trust_score || 0}/100</p>
-                        <h3 className="text-neutral-500 font-medium text-xs mt-1 uppercase tracking-wider">Trust Score</h3>
+                        <p className="text-2xl font-black text-white">{stats.profile?.trust_score || 0}</p>
+                        <h3 className="text-neutral-500 font-medium text-xs mt-1 uppercase tracking-wider">Рейтинг доверия</h3>
                     </div>
                 </div>
             )}

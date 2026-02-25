@@ -54,14 +54,15 @@ export async function GET(request: Request) {
             const isHolding = p.status === 'Модерация' || p.status === 'Опубликовано';
             const dateObj = new Date(p.updated_at);
             
-            if (isHolding) calcHolding += (p.reward || 0);
-            else calcAvailable += (p.reward || 0);
+            const rewardVal = parseFloat(p.reward) || 0;
+            if (isHolding) calcHolding += rewardVal;
+            else calcAvailable += rewardVal;
             
             transactions.push({
                 id: `PRJ-${p.id.substring(0, 6)}`,
                 project: briefTitle || 'Проект',
                 type: isHolding ? 'holding' : 'income',
-                amount: `${p.reward} ₽`,
+                amount: `${rewardVal} ₽`,
                 date: dateObj.toLocaleDateString('ru-RU'),
                 _rawDate: dateObj,
                 status: isHolding ? 'Холдирование' : 'Зачислено'
@@ -73,13 +74,14 @@ export async function GET(request: Request) {
             const projTitle = proj ? (Array.isArray(proj) ? proj[0]?.title : proj.title) : undefined;
             const dateObj = new Date(v.created_at);
             
-            calcAvailable += (v.kpi_bonus || 0);
+            const kpiBonus = parseFloat(v.kpi_bonus) || 0;
+            calcAvailable += kpiBonus;
 
             transactions.push({
                 id: `KPI-${v.id.substring(0, 6)}`,
                 project: `Бонус KPI: ${projTitle || 'Проект'}`,
                 type: 'income',
-                amount: `${v.kpi_bonus} ₽`,
+                amount: `${kpiBonus} ₽`,
                 date: dateObj.toLocaleDateString('ru-RU'),
                 _rawDate: dateObj,
                 status: 'Зачислено'

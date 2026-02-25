@@ -84,29 +84,31 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             if (!creatorId || !metric) return NextResponse.json({ error: 'creatorId and metric required' }, { status: 400 });
 
             const { error } = await supabase
-                .from('cr_kpi_configs')
-                .upsert({
-                    project_id: projectId,
-                    creator_id: creatorId,
-                    metric,
-                    rate: rate || 0,
-                    target: target || null
-                }, { onConflict: 'project_id,creator_id,metric' });
+                .from('cr_project_creators')
+                .update({
+                    kpi_metric: metric,
+                    kpi_rate: rate || 0,
+                    kpi_target: target || null
+                })
+                .eq('project_id', projectId)
+                .eq('creator_id', creatorId);
 
             if (error) throw error;
             return NextResponse.json({ success: true });
         }
 
         if (action === 'delete_kpi') {
-            const { metric } = body;
-            if (!creatorId || !metric) return NextResponse.json({ error: 'creatorId and metric required' }, { status: 400 });
+            if (!creatorId) return NextResponse.json({ error: 'creatorId required' }, { status: 400 });
 
             const { error } = await supabase
-                .from('cr_kpi_configs')
-                .delete()
+                .from('cr_project_creators')
+                .update({
+                    kpi_metric: null,
+                    kpi_rate: null,
+                    kpi_target: null
+                })
                 .eq('project_id', projectId)
-                .eq('creator_id', creatorId)
-                .eq('metric', metric);
+                .eq('creator_id', creatorId);
 
             if (error) throw error;
             return NextResponse.json({ success: true });

@@ -57,6 +57,7 @@ export default function ProfilePage() {
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState(false);
     const [portfolioItems, setPortfolioItems] = useState<any[]>([]);
+    const [equipment, setEquipment] = useState<{ id: string, name: string, type: string }[]>([]);
 
     // Form states
     const [formData, setFormData] = useState({
@@ -93,6 +94,7 @@ export default function ProfilePage() {
                         youtube: links.find(l => l.platform === 'youtube')?.url || '',
                         tiktok: links.find(l => l.platform === 'tiktok')?.url || '',
                     });
+                    setEquipment(Array.isArray(data.equipment) ? data.equipment : []);
                 }
             } catch (e) {
                 console.error('Error fetching profile:', e);
@@ -132,7 +134,8 @@ export default function ProfilePage() {
                     location: formData.location,
                     age: parseInt(formData.age, 10) || null,
                     avatar_url: formData.avatar_url,
-                    social_links
+                    social_links,
+                    equipment
                 })
             });
             const data = await res.json();
@@ -162,12 +165,32 @@ export default function ProfilePage() {
         <div className="flex flex-col gap-6 animate-fade-in pb-8">
             {/* Header Profile Info */}
             <div className="pt-2 flex flex-col md:flex-row gap-6 md:items-center bg-neutral-900 border border-neutral-800 p-6 rounded-3xl">
-                <div className="relative w-24 h-24 flex-shrink-0 rounded-full p-1 bg-gradient-to-tr from-blue-600 to-purple-600 shadow-xl">
-                    <img src={profile.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop"} alt="Avatar" className="w-full h-full rounded-full object-cover border-4 border-neutral-950" />
+                <div className="relative w-24 h-24 flex-shrink-0 rounded-full p-1 bg-gradient-to-tr from-blue-600 to-purple-600 shadow-xl group">
+                    <img src={formData.avatar_url || profile.avatar_url || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop"} alt="Avatar" className="w-full h-full rounded-full object-cover border-4 border-neutral-950 bg-neutral-800" />
                     {isEditing && (
-                        <div className="absolute bottom-0 right-0 bg-blue-500 text-white p-1.5 rounded-full border-2 border-neutral-950 shadow-md cursor-pointer hover:bg-blue-400">
-                            <Camera size={14} />
-                        </div>
+                        <>
+                            <input 
+                                type="file" 
+                                accept="image/*" 
+                                className="hidden" 
+                                id="avatar-upload" 
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                        const reader = new FileReader();
+                                        reader.onload = (ev) => {
+                                            if (ev.target?.result) {
+                                                setFormData({ ...formData, avatar_url: ev.target.result as string });
+                                            }
+                                        };
+                                        reader.readAsDataURL(file);
+                                    }
+                                }} 
+                            />
+                            <label htmlFor="avatar-upload" className="absolute bottom-0 right-0 bg-blue-500 text-white p-1.5 rounded-full border-2 border-neutral-950 shadow-md cursor-pointer hover:bg-blue-400 group-hover:scale-110 transition-transform">
+                                <Camera size={14} />
+                            </label>
+                        </>
                     )}
                 </div>
 
@@ -350,39 +373,63 @@ export default function ProfilePage() {
 
                 {/* Equipment Profile */}
                 <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-3xl flex flex-col h-full">
-                    <h3 className="font-bold text-lg text-white mb-4 flex justify-between items-center">
-                        Оборудование
-                        {isEditing && <span className="text-xs font-normal text-blue-500 cursor-pointer">Настроить</span>}
-                    </h3>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-lg text-white">Оборудование</h3>
+                    </div>
                     <div className="grid grid-cols-2 gap-3 flex-1 mt-1">
-                        <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center gap-2 relative">
-                            {isEditing && <div className="absolute top-2 right-2 text-neutral-600 hover:text-red-500 cursor-pointer"><X size={14} /></div>}
-                            <Smartphone size={24} className="text-blue-500" />
-                            <div>
-                                <p className="text-sm font-bold text-white leading-tight mt-1">iPhone 14 Pro</p>
-                                <p className="text-[10px] text-neutral-500 uppercase tracking-widest mt-1">Камера</p>
+                        {equipment.map(item => (
+                            <div key={item.id} className="bg-neutral-950 border border-neutral-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center gap-2 relative group">
+                                {isEditing && (
+                                    <div onClick={() => setEquipment(prev => prev.filter(e => e.id !== item.id))} className="absolute top-2 right-2 text-neutral-600 hover:text-red-500 cursor-pointer">
+                                        <X size={14} />
+                                    </div>
+                                )}
+                                {item.type === 'Камера' ? <Camera size={24} className="text-blue-500" /> :
+                                 item.type === 'Звук' ? <Mic size={24} className="text-purple-500" /> :
+                                 item.type === 'Свет' ? <Lightbulb size={24} className="text-orange-500" /> :
+                                 <Smartphone size={24} className="text-green-500" />}
+                                
+                                {isEditing ? (
+                                    <div className="w-full">
+                                        <input 
+                                           className="mt-1 w-full bg-transparent border-b border-neutral-700/50 text-sm font-bold text-white text-center focus:outline-none focus:border-blue-500 transition-colors"
+                                           value={item.name}
+                                           onChange={(e) => setEquipment(prev => prev.map(eq => eq.id === item.id ? { ...eq, name: e.target.value } : eq))}
+                                        />
+                                        <div className="w-full flex justify-center mt-1">
+                                            <select 
+                                                className="text-[10px] text-neutral-500 uppercase tracking-widest bg-transparent focus:outline-none text-center outline-none [&>option]:bg-neutral-900"
+                                                value={item.type}
+                                                onChange={(e) => setEquipment(prev => prev.map(eq => eq.id === item.id ? { ...eq, type: e.target.value } : eq))}
+                                            >
+                                                <option value="Камера">Камера</option>
+                                                <option value="Звук">Звук</option>
+                                                <option value="Свет">Свет</option>
+                                                <option value="Прочее">Прочее</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <p className="text-sm font-bold text-white leading-tight mt-1">{item.name}</p>
+                                        <p className="text-[10px] text-neutral-500 uppercase tracking-widest mt-1">{item.type}</p>
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                        <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center gap-2 relative">
-                            {isEditing && <div className="absolute top-2 right-2 text-neutral-600 hover:text-red-500 cursor-pointer"><X size={14} /></div>}
-                            <Mic size={24} className="text-purple-500" />
-                            <div>
-                                <p className="text-sm font-bold text-white leading-tight mt-1">DJI Mic</p>
-                                <p className="text-[10px] text-neutral-500 uppercase tracking-widest mt-1">Звук</p>
+                        ))}
+                        {isEditing && (
+                            <div onClick={() => {
+                                setEquipment(prev => [...prev, { id: Date.now().toString(), name: 'Название...', type: 'Камера' }]);
+                            }} className="bg-neutral-950 border border-neutral-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center gap-2 cursor-pointer hover:bg-neutral-800 transition-colors border-dashed text-neutral-500 hover:text-white">
+                                <Plus size={24} />
+                                <p className="text-[10px] font-bold mt-2 uppercase">Добавить</p>
                             </div>
-                        </div>
-                        <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center gap-2 relative">
-                            {isEditing && <div className="absolute top-2 right-2 text-neutral-600 hover:text-red-500 cursor-pointer"><X size={14} /></div>}
-                            <Lightbulb size={24} className="text-orange-500" />
-                            <div>
-                                <p className="text-sm font-bold text-white leading-tight mt-1">RGB Ring 45cm</p>
-                                <p className="text-[10px] text-neutral-500 uppercase tracking-widest mt-1">Свет</p>
+                        )}
+                        {!isEditing && equipment.length === 0 && (
+                            <div className="col-span-2 text-neutral-500 text-sm py-4 text-center">
+                                Оборудование не добавлено. Нажмите «Редактировать», чтобы добавить.
                             </div>
-                        </div>
-                        <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center gap-2 cursor-pointer hover:bg-neutral-800 transition-colors border-dashed text-neutral-500 hover:text-white">
-                            <Plus size={24} />
-                            <p className="text-[10px] font-bold mt-2 uppercase">Добавить</p>
-                        </div>
+                        )}
                     </div>
                 </div>
             </div>

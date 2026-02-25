@@ -4,14 +4,15 @@ import { useState, useEffect, useCallback } from 'react';
 import {
     Eye, ThumbsUp, MessageCircle, ExternalLink, RefreshCw, Check, X,
     ChevronDown, Plus, Users, FolderOpen, Inbox, Shield,
-    Target, Trash2, Video, Loader2, UserCheck, UserX, Clock
+    Target, Trash2, Video, Loader2, UserCheck, UserX, Clock,
+    BookOpen, Edit3, Save, Image, Type, FileText, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useGlobalStore } from '@/store/global';
 import { supabase } from '@/lib/supabase';
 import { PLATFORMS, formatNumber, getYouTubeThumbnail, getProjectThumbnail } from '@/lib/utils';
 
-type AdminTab = 'projects' | 'creators' | 'applications';
+type AdminTab = 'projects' | 'creators' | 'applications' | 'articles';
 
 const KPI_METRICS = [
     { key: 'views', label: 'Просмотры' },
@@ -33,6 +34,12 @@ export default function AdminPage() {
     const [creators, setCreators] = useState<any[]>([]);
     const [applications, setApplications] = useState<any[]>([]);
     const [brands, setBrands] = useState<any[]>([]);
+
+    // Articles state
+    const [articles, setArticles] = useState<any[]>([]);
+    const [editingArticle, setEditingArticle] = useState<any>(null);
+    const [articleForm, setArticleForm] = useState({ title: '', slug: '', excerpt: '', category: 'content', read_time: 5, cover_image: '', content: '', published: true });
+    const [savingArticle, setSavingArticle] = useState(false);
 
     // UI states
     const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
@@ -165,6 +172,71 @@ export default function AdminPage() {
         await fetchData();
     };
 
+    // Articles CRUD
+    const fetchArticles = useCallback(async () => {
+        const res = await fetch('/api/articles');
+        const d = await res.json();
+        setArticles(d.articles || []);
+    }, []);
+
+    useEffect(() => { if (authorized) fetchArticles(); }, [authorized, fetchArticles]);
+
+    const startEditArticle = (article: any) => {
+        setEditingArticle(article);
+        setArticleForm({
+            title: article.title,
+            slug: article.slug,
+            excerpt: article.excerpt || '',
+            category: article.category || 'content',
+            read_time: article.read_time || 5,
+            cover_image: article.cover_image || '',
+            content: article.content || '',
+            published: article.published ?? true,
+        });
+    };
+
+    const startNewArticle = () => {
+        setEditingArticle({ id: null });
+        setArticleForm({ title: '', slug: '', excerpt: '', category: 'content', read_time: 5, cover_image: '', content: '', published: true });
+    };
+
+    const saveArticle = async () => {
+        setSavingArticle(true);
+        try {
+            if (editingArticle?.id) {
+                await fetch('/api/articles', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: editingArticle.id, ...articleForm })
+                });
+            } else {
+                await fetch('/api/articles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(articleForm)
+                });
+            }
+            setEditingArticle(null);
+            await fetchArticles();
+        } catch(e) { console.error(e); }
+        setSavingArticle(false);
+    };
+
+    const deleteArticle = async (id: string) => {
+        if (!confirm('Удалить статью?')) return;
+        await fetch(`/api/articles?id=${id}`, { method: 'DELETE' });
+        await fetchArticles();
+    };
+
+    const toggleArticlePublished = async (article: any) => {
+        await fetch('/api/articles', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: article.id, published: !article.published })
+        });
+        await fetchArticles();
+    };
+
     if (loading) return <div className="p-8 text-neutral-400 animate-pulse text-center">Загрузка...</div>;
     if (!authorized) return <div className="p-8 text-red-400 text-center">Доступ запрещён</div>;
 
@@ -176,6 +248,7 @@ export default function AdminPage() {
         { key: 'projects', label: 'Проекты', icon: FolderOpen, count: pendingVideos > 0 ? pendingVideos : undefined },
         { key: 'creators', label: 'Креаторы', icon: Users, count: pendingCreators.length > 0 ? pendingCreators.length : undefined },
         { key: 'applications', label: 'Заявки', icon: Inbox, count: pendingApps.length > 0 ? pendingApps.length : undefined },
+        { key: 'articles', label: 'Статьи', icon: BookOpen, count: articles.length > 0 ? articles.length : undefined },
     ];
 
     return (
@@ -189,6 +262,11 @@ export default function AdminPage() {
                 {activeTab === 'projects' && (
                     <button onClick={() => setShowCreateProject(true)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-2.5 font-bold text-sm transition-all flex items-center gap-2 shrink-0">
                         <Plus size={16} /> Проект
+                    </button>
+                )}
+                {activeTab === 'articles' && !editingArticle && (
+                    <button onClick={startNewArticle} className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-5 py-2.5 font-bold text-sm transition-all flex items-center gap-2 shrink-0">
+                        <Plus size={16} /> Статья
                     </button>
                 )}
             </div>
@@ -276,10 +354,19 @@ export default function AdminPage() {
                                                         <div className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center font-bold text-xs text-white overflow-hidden shrink-0">
                                                             {a.creator?.avatar_url ? <img src={a.creator.avatar_url} className="w-full h-full object-cover" /> : (a.creator?.full_name?.charAt(0) || '?')}
                                                         </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="text-sm font-medium text-white">{a.creator?.full_name || a.creator?.username || '—'}</div>
+                                                        <div className="flex-1 min-w-0 flex items-center gap-4 justify-between">
+                                                            <div className="text-sm font-medium text-white truncate">{a.creator?.full_name || a.creator?.username || '—'}</div>
+                                                            <div className="shrink-0 flex items-center">
+                                                                {(!a.kpi_metric || (a.kpi_rate === 0 && !a.kpi_target)) ? (
+                                                                    <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20 uppercase whitespace-nowrap">Нет KPI</span>
+                                                                ) : (
+                                                                    <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 flex items-center gap-1 whitespace-nowrap">
+                                                                        KPI: {KPI_METRICS.find(m => m.key === a.kpi_metric)?.label || a.kpi_metric} <span className="text-blue-300">{a.kpi_rate}₽</span> {a.kpi_target ? `/ цель ${a.kpi_target}` : ''}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                        <button onClick={() => removeCreator(project.id, a.creator_id)} className="text-red-400 hover:text-red-300 p-1"><Trash2 size={14} /></button>
+                                                        <button onClick={() => removeCreator(project.id, a.creator_id)} className="text-red-400 hover:text-red-300 p-1 shrink-0"><Trash2 size={14} /></button>
                                                     </div>
                                                 ))}
                                                 <select
@@ -579,6 +666,163 @@ export default function AdminPage() {
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* ====== TAB: ARTICLES ====== */}
+            {activeTab === 'articles' && (
+                <div className="space-y-4">
+                    {editingArticle ? (
+                        /* Article Editor */
+                        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 space-y-4">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <Edit3 size={18} />
+                                    {editingArticle.id ? 'Редактировать статью' : 'Новая статья'}
+                                </h3>
+                                <button onClick={() => setEditingArticle(null)} className="text-neutral-400 hover:text-white">
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">Заголовок</label>
+                                    <input value={articleForm.title}
+                                        onChange={e => {
+                                            const title = e.target.value;
+                                            const slug = editingArticle.id ? articleForm.slug : title.toLowerCase().replace(/[^a-zа-яё0-9]+/gi, '-').replace(/^-|-$/g, '');
+                                            setArticleForm({...articleForm, title, slug});
+                                        }}
+                                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
+                                        placeholder="Название статьи" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">Slug (URL)</label>
+                                    <input value={articleForm.slug}
+                                        onChange={e => setArticleForm({...articleForm, slug: e.target.value})}
+                                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none font-mono text-sm"
+                                        placeholder="my-article-slug" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">Краткое описание</label>
+                                <textarea value={articleForm.excerpt}
+                                    onChange={e => setArticleForm({...articleForm, excerpt: e.target.value})}
+                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none resize-none h-16"
+                                    placeholder="Короткое описание для карточки..." />
+                            </div>
+
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">Категория</label>
+                                    <select value={articleForm.category}
+                                        onChange={e => setArticleForm({...articleForm, category: e.target.value})}
+                                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-3 text-white focus:border-blue-500 focus:outline-none text-sm">
+                                        <option value="production">Продакшен</option>
+                                        <option value="platforms">Платформы</option>
+                                        <option value="monetization">Монетизация</option>
+                                        <option value="content">Контент</option>
+                                        <option value="legal">Юридическое</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">Время чтения (мин)</label>
+                                    <input type="number" value={articleForm.read_time}
+                                        onChange={e => setArticleForm({...articleForm, read_time: parseInt(e.target.value) || 5})}
+                                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
+                                        min={1} max={60} />
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">URL обложки</label>
+                                    <input value={articleForm.cover_image}
+                                        onChange={e => setArticleForm({...articleForm, cover_image: e.target.value})}
+                                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none text-sm"
+                                        placeholder="https://images.unsplash.com/..." />
+                                </div>
+                            </div>
+
+                            {articleForm.cover_image && (
+                                <div className="relative w-full aspect-[3/1] rounded-xl overflow-hidden bg-neutral-950 border border-neutral-800">
+                                    <img src={articleForm.cover_image} alt="preview" className="w-full h-full object-cover" />
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="block text-xs font-bold text-neutral-500 uppercase mb-1 flex items-center gap-2">
+                                    <FileText size={12} /> Контент (Markdown)
+                                </label>
+                                <textarea value={articleForm.content}
+                                    onChange={e => setArticleForm({...articleForm, content: e.target.value})}
+                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none resize-y font-mono text-sm leading-relaxed"
+                                    style={{minHeight: '300px'}}
+                                    placeholder="# Заголовок&#10;&#10;Текст статьи в формате Markdown...&#10;&#10;## Подзаголовок&#10;&#10;- Пункт 1&#10;- Пункт 2" />
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                                <button onClick={() => setArticleForm({...articleForm, published: !articleForm.published})}
+                                    className={`flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition-all ${articleForm.published ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-neutral-800 text-neutral-400 border border-neutral-700'}`}>
+                                    {articleForm.published ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                                    {articleForm.published ? 'Опубликована' : 'Черновик'}
+                                </button>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setEditingArticle(null)} className="px-5 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl font-bold text-sm transition-colors">Отмена</button>
+                                    <button onClick={saveArticle} disabled={savingArticle || !articleForm.title || !articleForm.slug}
+                                        className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-colors flex items-center gap-2">
+                                        <Save size={14} /> {savingArticle ? 'Сохранение...' : 'Сохранить'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        /* Articles List */
+                        articles.length === 0 ? (
+                            <div className="text-center py-16 bg-neutral-900 border border-neutral-800 rounded-2xl">
+                                <BookOpen size={40} className="mx-auto text-neutral-600 mb-3" />
+                                <p className="text-neutral-400">Нет статей</p>
+                                <button onClick={startNewArticle} className="mt-4 text-blue-400 hover:text-blue-300 text-sm font-medium">Создать первую статью</button>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {articles.map((article: any) => (
+                                    <div key={article.id} className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex items-center gap-4 hover:border-neutral-700 transition-all">
+                                        {article.cover_image && (
+                                            <div className="w-16 h-12 rounded-lg overflow-hidden shrink-0 bg-neutral-800">
+                                                <img src={article.cover_image} alt="" className="w-full h-full object-cover" />
+                                            </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-sm font-bold text-white truncate">{article.title}</h3>
+                                                {!article.published && (
+                                                    <span className="text-[9px] font-bold text-yellow-400 bg-yellow-400/10 px-1.5 py-0.5 rounded-full border border-yellow-400/20 uppercase">Черновик</span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-3 text-[11px] text-neutral-500 mt-0.5">
+                                                <span className="capitalize">{article.category}</span>
+                                                <span>{article.read_time} мин</span>
+                                                <span>/{article.slug}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <button onClick={() => toggleArticlePublished(article)}
+                                                className={`p-2 rounded-lg transition-colors ${article.published ? 'text-green-400 hover:bg-green-500/10' : 'text-neutral-500 hover:bg-neutral-800'}`}
+                                                title={article.published ? 'Снять с публикации' : 'Опубликовать'}>
+                                                {article.published ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                                            </button>
+                                            <button onClick={() => startEditArticle(article)} className="text-blue-400 hover:bg-blue-500/10 p-2 rounded-lg transition-colors" title="Редактировать">
+                                                <Edit3 size={14} />
+                                            </button>
+                                            <button onClick={() => deleteArticle(article.id)} className="text-red-400 hover:bg-red-500/10 p-2 rounded-lg transition-colors" title="Удалить">
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )
+                    )}
                 </div>
             )}
         </div>
