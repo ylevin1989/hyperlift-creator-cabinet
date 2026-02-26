@@ -259,328 +259,74 @@ async function parseTikTok(url: string): Promise<VideoMetrics> {
 
 // ─── Instagram ──────────────────────────────────────────────────────────────
 async function parseInstagram(url: string): Promise<VideoMetrics> {
-    let result: VideoMetrics = { title: '', views: 0, likes: 0, comments: 0 };
+    let title = '', views = 0, likes = 0, comments = 0, thumbnail_url = '';
 
-    // When RapidAPI key is available — use ONLY RapidAPI, no fallback
-    // Embed/direct/puppeteer return stale cached data
-    const rapidApiKey = process.env.RAPIDAPI_KEY;
-    if (rapidApiKey) {
+    const apifyToken = process.env.APIFY_TOKEN;
+    if (!apifyToken) {
+        console.warn('[IG Parser] APIFY_TOKEN is missing. Returning zeros.');
+        return { title, views, likes, comments, thumbnail_url };
+    }
+
+    try {
+        console.log('[IG Parser] Using Apify (strictly)...');
+        // We can just pass the URL directly to Apify
+        const apifyUrl = `https://api.apify.com/v2/acts/shu8hvrXbJbY3Eb9W/run-sync-get-dataset-items?token=${apifyToken}`;
+
+        const controller = new AbortController();
+        // Give Apify up to 30 seconds since it spins up a headless browser
+        const timeout = setTimeout(() => controller.abort(), 30000);
+
         try {
-            console.log('[IG Parser] Using RapidAPI ONLY (most accurate)...');
-            result = await parseInstagramRapidAPI(url, rapidApiKey);
-            console.log('[IG Parser] RapidAPI result:', result);
-            // Always return RapidAPI result, even if zeros — it's more trustworthy
-            // than cached embed pages. For photos, views=0 is expected.
-            return result;
-        } catch (e: any) {
-            console.error('[IG Parser] RapidAPI failed:', e?.message || e);
-            // Only fall through to other strategies if RapidAPI itself errors
-        }
-    }
+            const res = await fetch(apifyUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    directUrls: [url],
+                    resultsLimit: 1
+                }),
+                signal: controller.signal,
+            });
 
-    // Fallback strategies ONLY when no RapidAPI key or RapidAPI request errors
-
-    // Strategy 2: Embed page
-    try {
-        console.log('[IG Parser] Fallback: Embed page...');
-        result = await parseInstagramEmbed(url);
-        if (result.views > 0 || result.likes > 0 || result.comments > 0) {
-            console.log('[IG Parser] Embed success:', result);
-            return result;
-        }
-    } catch (e: any) {
-        console.error('[IG Parser] Embed error:', e?.message || e);
-    }
-
-    // Strategy 3: Direct page fetch
-    try {
-        console.log('[IG Parser] Fallback: Direct fetch...');
-        result = await parseInstagramDirect(url);
-        if (result.views > 0 || result.likes > 0 || result.comments > 0) {
-            console.log('[IG Parser] Direct success:', result);
-            return result;
-        }
-    } catch (e: any) {
-        console.error('[IG Parser] Direct error:', e?.message || e);
-    }
-
-    // Strategy 4: Puppeteer (skip in production — too heavy for Docker)
-    // Only available when puppeteer is installed
-    try {
-        console.log('[IG Parser] Fallback: Puppeteer...');
-        result = await parseInstagramPuppeteer(url);
-        if (result.views > 0 || result.likes > 0 || result.comments > 0) {
-            console.log('[IG Parser] Puppeteer success:', result);
-            return result;
-        }
-    } catch (e: any) {
-        console.error('[IG Parser] Puppeteer error:', e?.message || e);
-    }
-
-    return result;
-}
-
-// Extract the post shortcode from various Instagram URL formats
-function getInstagramShortcode(url: string): string | null {
-    const match = url.match(/instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
-    return match ? match[1] : null;
-}
-
-// Strategy 1: Instagram embed page — publicly accessible, no login
-async function parseInstagramEmbed(url: string): Promise<VideoMetrics> {
-    let title = '', views = 0, likes = 0, comments = 0, thumbnail_url = '';
-
-    const shortcode = getInstagramShortcode(url);
-    if (!shortcode) throw new Error('Cannot extract shortcode from URL');
-
-    const embedUrl = `https://www.instagram.com/p/${shortcode}/embed/`;
-    const html = await safeFetch(embedUrl, {
-        'Referer': 'https://www.instagram.com/',
-    });
-
-    // Thumbnail — from embed JSON: display_uri, display_url, or og:image
-    const thumbMatch = html.match(/"display_uri":"([^"]+)"/) ||
-        html.match(/"display_url":"([^"]+)"/) ||
-        html.match(/"thumbnail_src":"([^"]+)"/) ||
-        html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i);
-    if (thumbMatch) {
-        thumbnail_url = thumbMatch[1].replace(/\\u0026/g, '&').replace(/\\\/\//g, '//');
-    }
-
-    // Likes from embed
-    const likesMatch = html.match(/([\d,]+)\s*likes?/i) ||
-        html.match(/([\d,]+)\s*отмет/i) ||
-        html.match(/"edge_media_preview_like":\{"count":(\d+)\}/) ||
-        html.match(/"like_count":(\d+)/);
-    if (likesMatch) likes = parseInt(likesMatch[1].replace(/\D/g, ''), 10);
-
-    // Comments from embed
-    const commentsMatch = html.match(/"edge_media_to_comment":\{"count":(\d+)\}/) ||
-        html.match(/"comment_count":(\d+)/) ||
-        html.match(/([\d,]+)\s*comments?/i) ||
-        html.match(/([\d,]+)\s*комментар/i);
-    if (commentsMatch) comments = parseInt(commentsMatch[1].replace(/\D/g, ''), 10);
-
-    // Views
-    const viewsMatch = html.match(/"video_view_count":(\d+)/) ||
-        html.match(/"play_count":(\d+)/) ||
-        html.match(/([\d,]+)\s*views?/i) ||
-        html.match(/([\d,]+)\s*просмотр/i);
-    if (viewsMatch) views = parseInt(viewsMatch[1].replace(/\D/g, ''), 10);
-
-    // Title from caption
-    const captionMatch = html.match(/<div class="Caption"[^>]*>[\s\S]*?<span>([\s\S]*?)<\/span>/) ||
-        html.match(/"caption":\{"text":"([^"]{0,100})"/);
-    if (captionMatch) {
-        title = captionMatch[1].replace(/<[^>]+>/g, '').trim();
-        if (title.length > 60) title = title.substring(0, 60) + '...';
-    }
-
-    return { title, views, likes, comments, thumbnail_url };
-}
-
-// Strategy 2: Direct fetch of the Instagram page
-async function parseInstagramDirect(url: string): Promise<VideoMetrics> {
-    let title = '', views = 0, likes = 0, comments = 0, thumbnail_url = '';
-
-    const html = await safeFetch(url);
-
-    // Thumbnail — from JSON: display_uri, display_url, thumbnail_src, or og:image
-    const thumbMatch = html.match(/"display_uri":"([^"]+)"/) ||
-        html.match(/"display_url":"([^"]+)"/) ||
-        html.match(/"thumbnail_src":"([^"]+)"/) ||
-        html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i);
-    if (thumbMatch) {
-        thumbnail_url = thumbMatch[1].replace(/\\u0026/g, '&').replace(/\\\/\//g, '//');
-    }
-
-    // og:description often has "X Likes, Y Comments"
-    const metaDesc = html.match(/<meta\s+(?:property|name)="og:description"\s+content="([^"]+)"/i) ||
-        html.match(/<meta\s+content="([^"]+)"\s+(?:property|name)="og:description"/i);
-    if (metaDesc && metaDesc[1]) {
-        const desc = metaDesc[1];
-        const lMatch = desc.match(/([\d,.\s]+)\s*Likes/i) || desc.match(/([\d,.\s]+)\s*отмет/i);
-        const cMatch = desc.match(/([\d,.\s]+)\s*Comments/i) || desc.match(/([\d,.\s]+)\s*комментар/i);
-        const vMatch = desc.match(/([\d,.\s]+)\s*(Views|просмотр|plays)/i);
-        if (lMatch) likes = parseInt(lMatch[1].replace(/\D/g, ''), 10);
-        if (cMatch) comments = parseInt(cMatch[1].replace(/\D/g, ''), 10);
-        if (vMatch) views = parseInt(vMatch[1].replace(/\D/g, ''), 10);
-    }
-
-    // JSON data inside page
-    const jsonLikes = html.match(/"like_count":(\d+)/) || html.match(/"edge_media_preview_like":\{"count":(\d+)\}/);
-    const jsonComments = html.match(/"comment_count":(\d+)/) || html.match(/"edge_media_to_comment":\{"count":(\d+)\}/);
-    const jsonViews = html.match(/"video_view_count":(\d+)/) || html.match(/"play_count":(\d+)/);
-    if (jsonLikes && !likes) likes = parseInt(jsonLikes[1], 10);
-    if (jsonComments && !comments) comments = parseInt(jsonComments[1], 10);
-    if (jsonViews && !views) views = parseInt(jsonViews[1], 10);
-
-    // Title
-    const titleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i);
-    if (titleMatch) {
-        title = titleMatch[1].replace(/on Instagram.*$/i, '').replace(/Instagram.*/i, '').trim();
-        if (title.length > 60) title = title.substring(0, 60) + '...';
-    }
-
-    return { title, views, likes, comments, thumbnail_url };
-}
-
-// Strategy 3: Puppeteer headless browser (most reliable but heavy)
-async function parseInstagramPuppeteer(url: string): Promise<VideoMetrics> {
-    let title = '', views = 0, likes = 0, comments = 0, thumbnail_url = '';
-
-    let puppeteerExtra, StealthPlugin;
-    try {
-        puppeteerExtra = await import('puppeteer-extra');
-        StealthPlugin = await import('puppeteer-extra-plugin-stealth');
-    } catch (e: any) {
-        console.error('[IG Puppeteer] Cannot import puppeteer:', e?.message);
-        throw new Error('Puppeteer not available');
-    }
-
-    const puppeteer = puppeteerExtra.default;
-    puppeteer.use(StealthPlugin.default());
-
-    let browser;
-    try {
-        browser = await puppeteer.launch({
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--single-process',
-                '--disable-features=site-per-process',
-            ]
-        });
-    } catch (e: any) {
-        console.error('[IG Puppeteer] Failed to launch browser:', e?.message);
-        throw new Error('Cannot launch browser: ' + (e?.message || ''));
-    }
-
-    try {
-        const page = await browser.newPage();
-        await page.setUserAgent(UA);
-        await page.setViewport({ width: 1280, height: 800 });
-
-        // Block heavy resources
-        await page.setRequestInterception(true);
-        page.on('request', (req: any) => {
-            const type = req.resourceType();
-            if (['image', 'stylesheet', 'font', 'media'].includes(type)) {
-                req.abort();
-            } else {
-                req.continue();
+            if (!res.ok) {
+                const errBody = await res.text();
+                console.error(`[IG Apify] HTTP ${res.status}: ${errBody}`);
+                return { title, views, likes, comments, thumbnail_url };
             }
-        });
 
-        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
-        await new Promise(r => setTimeout(r, 3000));
+            const data = await res.json();
 
-        const html = await page.content();
-
-        // Thumbnail — from JSON: display_uri, display_url, thumbnail_src, or og:image
-        const thumbMatch = html.match(/"display_uri":"([^"]+)"/) ||
-            html.match(/"display_url":"([^"]+)"/) ||
-            html.match(/"thumbnail_src":"([^"]+)"/) ||
-            html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i);
-        if (thumbMatch) {
-            thumbnail_url = thumbMatch[1].replace(/\\u0026/g, '&').replace(/\\\/\//g, '//');
-        }
-
-        // og:description "X Likes, Y Comments..."
-        const metaDesc = html.match(/<meta\s+property="og:description"\s+content="([^"]+)"/i);
-        if (metaDesc && metaDesc[1]) {
-            const desc = metaDesc[1];
-            const lMatch = desc.match(/([\d,.\s]+)\s*Likes/i) || desc.match(/([\d,.\s]+)\s*отмет/i);
-            const cMatch = desc.match(/([\d,.\s]+)\s*Comments/i) || desc.match(/([\d,.\s]+)\s*комментар/i);
-            const vMatch = desc.match(/([\d,.\s]+)\s*(Views|просмотр|plays)/i);
-            if (lMatch) likes = parseInt(lMatch[1].replace(/\D/g, ''), 10);
-            if (cMatch) comments = parseInt(cMatch[1].replace(/\D/g, ''), 10);
-            if (vMatch) views = parseInt(vMatch[1].replace(/\D/g, ''), 10);
-        }
-
-        // JSON data
-        const jsonLikes = html.match(/"like_count":(\d+)/);
-        const jsonComments = html.match(/"comment_count":(\d+)/);
-        const jsonViews = html.match(/"video_view_count":(\d+)/) || html.match(/"play_count":(\d+)/);
-        if (jsonLikes && !likes) likes = parseInt(jsonLikes[1], 10);
-        if (jsonComments && !comments) comments = parseInt(jsonComments[1], 10);
-        if (jsonViews && !views) views = parseInt(jsonViews[1], 10);
-
-        // Title
-        const titleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i);
-        if (titleMatch) {
-            title = titleMatch[1].replace(/on Instagram.*$/i, '').replace(/Instagram.*/i, '').trim();
-            if (title.length > 60) title = title.substring(0, 60) + '...';
-        }
-    } finally {
-        if (browser) await browser.close();
-    }
-
-    return { title, views, likes, comments, thumbnail_url };
-}
-
-// Strategy 4: RapidAPI (paid, most reliable)
-async function parseInstagramRapidAPI(url: string, apiKey: string): Promise<VideoMetrics> {
-    let title = '', views = 0, likes = 0, comments = 0;
-
-    // Extract shortcode from URL
-    const shortcode = getInstagramShortcode(url);
-    if (!shortcode) throw new Error('Cannot extract shortcode');
-
-    const rapidApiUrl = `https://instagram-scraper2.p.rapidapi.com/media_info?short_code=${shortcode}`;
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-
-    let thumbnail_url = '';
-    try {
-        const res = await fetch(rapidApiUrl, {
-            method: 'GET',
-            headers: {
-                'x-rapidapi-key': apiKey,
-                'x-rapidapi-host': 'instagram-scraper2.p.rapidapi.com'
-            },
-            signal: controller.signal,
-        });
-
-        // Check for API errors (quota exceeded, unauthorized, etc.)
-        if (!res.ok) {
-            const errBody = await res.text();
-            console.error(`[IG RapidAPI] HTTP ${res.status}: ${errBody}`);
-            throw new Error(`RapidAPI HTTP ${res.status}: ${errBody}`);
-        }
-
-        const data = await res.json();
-
-        // Check for API-level errors
-        if (data?.message && !data?.data) {
-            console.error('[IG RapidAPI] API error:', data.message);
-            throw new Error(`RapidAPI error: ${data.message}`);
-        }
-
-        const media = data?.data?.shortcode_media;
-        if (media) {
-            likes = media.edge_media_preview_like?.count || 0;
-            comments = media.edge_media_to_parent_comment?.count || media.edge_media_to_comment?.count || 0;
-            views = media.video_view_count || media.video_play_count || 0;
-
-            // Thumbnail
-            thumbnail_url = media.thumbnail_src || media.display_url || '';
-
-            // Title from caption
-            const captionEdges = media.edge_media_to_caption?.edges;
-            if (captionEdges?.[0]?.node?.text) {
-                const fullTitle = captionEdges[0].node.text;
-                title = fullTitle.length > 60 ? fullTitle.substring(0, 60) + '...' : fullTitle;
+            if (!Array.isArray(data) || data.length === 0) {
+                console.warn('[IG Apify] Empty dataset returned');
+                return { title, views, likes, comments, thumbnail_url };
             }
+
+            const media = data[0];
+            
+            likes = media.likesCount || 0;
+            comments = media.commentsCount || 0;
+            views = media.videoViewCount || media.videoPlayCount || 0;
+            
+            let raw_thumb = media.displayUrl || media.thumbnailUrl || '';
+            if (raw_thumb) {
+                // Use a proxy (wsrv.nl) to avoid Instagram CORS block and broken images on the frontend
+                thumbnail_url = `https://wsrv.nl/?url=${encodeURIComponent(raw_thumb)}`;
+            }
+            
+            if (media.caption) {
+                title = media.caption.length > 60 ? media.caption.substring(0, 60) + '...' : media.caption;
+            }
+
+        } finally {
+            clearTimeout(timeout);
+        }
+    } catch (e: any) {
+        if (e.name === 'AbortError') {
+            console.error('[IG Parser] Apify request timed out (>30s)');
         } else {
-            console.warn('[IG RapidAPI] No shortcode_media in response');
+            console.error('[IG Parser] Apify failed:', e?.message || e);
         }
-    } finally {
-        clearTimeout(timeout);
     }
 
     return { title, views, likes, comments, thumbnail_url };

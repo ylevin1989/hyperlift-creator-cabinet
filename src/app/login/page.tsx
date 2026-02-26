@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock, Mail, ChevronRight } from 'lucide-react';
 import { useGlobalStore } from '@/store/global';
+import TelegramLogin from '@/components/TelegramLogin';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -94,6 +95,40 @@ export default function LoginPage() {
                     >
                         {loading ? 'Вход...' : 'Войти'} {!loading && <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />}
                     </button>
+
+                    <div className="flex items-center my-6">
+                        <div className="flex-grow border-t border-neutral-800"></div>
+                        <span className="px-4 text-xs tracking-wider text-neutral-500 font-medium">ИЛИ</span>
+                        <div className="flex-grow border-t border-neutral-800"></div>
+                    </div>
+
+                    <div className="flex justify-center content-center w-full min-h-[40px]">
+                        <TelegramLogin 
+                            botName={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'hypertik_bot'} 
+                            onAuth={async (user: any) => {
+                                setLoading(true);
+                                setError('');
+                                try {
+                                    const res = await fetch('/api/auth/telegram', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify(user)
+                                    });
+                                    const data = await res.json();
+                                    if (res.ok && data.success) {
+                                        setUserId(data.userId);
+                                        router.push('/dashboard');
+                                    } else {
+                                        setError(data.error || 'Ошибка входа через Telegram');
+                                    }
+                                } catch (err) {
+                                    setError('Сеть недоступна');
+                                } finally {
+                                    setLoading(false);
+                                }
+                            }} 
+                        />
+                    </div>
 
                     <p className="text-center text-sm text-neutral-500 mt-6 font-medium">
                         Хотите стать креатором? <a href="/register" className="text-white hover:text-blue-400 underline decoration-neutral-700 underline-offset-4 transition-colors">Оставить заявку</a>

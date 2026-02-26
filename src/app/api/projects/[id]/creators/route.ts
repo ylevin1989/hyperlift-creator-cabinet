@@ -94,6 +94,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
                 .eq('creator_id', creatorId);
 
             if (error) throw error;
+
+            // Trigger KPI recalculation for existing assets by updating them
+            await supabase.from('cr_video_assets')
+                .update({ last_stats_update: new Date().toISOString() })
+                .eq('project_id', projectId)
+                .eq('creator_id', creatorId);
+
             return NextResponse.json({ success: true });
         }
 
