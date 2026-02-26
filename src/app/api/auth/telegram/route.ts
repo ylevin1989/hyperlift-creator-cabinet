@@ -11,18 +11,26 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Telegram Bot Token not configured' }, { status: 500 });
         }
 
-        const { hash, ...data } = body;
-        
         // Verify hash
+        const { hash, ...data } = body;
+        console.log('[Telegram Auth] Body keys:', Object.keys(body));
+        console.log('[Telegram Auth] Bot Token length:', botToken?.length);
+
         const secretKey = crypto.createHash('sha256').update(botToken).digest();
         const dataCheckString = Object.keys(data)
             .sort()
+            .filter(key => data[key] !== undefined && data[key] !== null)
             .map(key => `${key}=${data[key]}`)
             .join('\n');
+            
+        console.log('[Telegram Auth] Data Check String:\n', dataCheckString);
             
         const hmac = crypto.createHmac('sha256', secretKey)
             .update(dataCheckString)
             .digest('hex');
+            
+        console.log('[Telegram Auth] Calculated hmac:', hmac);
+        console.log('[Telegram Auth] Received hash:', hash);
             
         if (hmac !== hash) {
             return NextResponse.json({ error: 'Data is NOT from Telegram' }, { status: 403 });
