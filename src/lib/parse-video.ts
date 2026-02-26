@@ -34,7 +34,7 @@ export async function parseVideoMetrics(url: string): Promise<VideoMetrics> {
             comments: Number.isNaN(result.comments) ? 0 : result.comments,
             thumbnail_url: result.thumbnail_url
         };
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error('parseVideoMetrics top-level error:', e);
     }
     return { title: '', views: 0, likes: 0, comments: 0 };
@@ -308,7 +308,7 @@ async function parseInstagram(url: string): Promise<VideoMetrics> {
             comments = media.commentsCount || 0;
             views = media.videoViewCount || media.videoPlayCount || 0;
             
-            let raw_thumb = media.displayUrl || media.thumbnailUrl || '';
+            const raw_thumb = media.displayUrl || media.thumbnailUrl || '';
             if (raw_thumb) {
                 // Use a proxy (wsrv.nl) to avoid Instagram CORS block and broken images on the frontend
                 thumbnail_url = `https://wsrv.nl/?url=${encodeURIComponent(raw_thumb)}`;
@@ -321,11 +321,12 @@ async function parseInstagram(url: string): Promise<VideoMetrics> {
         } finally {
             clearTimeout(timeout);
         }
-    } catch (e: any) {
-        if (e.name === 'AbortError') {
+    } catch (e: unknown) {
+        const err = e as { name?: string; message?: string };
+        if (err.name === 'AbortError') {
             console.error('[IG Parser] Apify request timed out (>30s)');
         } else {
-            console.error('[IG Parser] Apify failed:', e?.message || e);
+            console.error('[IG Parser] Apify failed:', err.message || e);
         }
     }
 

@@ -22,7 +22,8 @@ export default function TelegramLogin({ botName, onAuth }: TelegramLoginProps) {
 
   useEffect(() => {
     // Add global callback for the script
-    (window as any).onTelegramAuth = (user: TelegramUser) => {
+    const win = window as unknown as { onTelegramAuth: (user: TelegramUser) => void };
+    win.onTelegramAuth = (user: TelegramUser) => {
       onAuth(user);
     };
 

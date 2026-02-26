@@ -105,7 +105,7 @@ export default function LoginPage() {
                     <div className="flex justify-center content-center w-full min-h-[40px]">
                         <TelegramLogin 
                             botName={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'hypertik_bot'} 
-                            onAuth={async (user: any) => {
+                            onAuth={async (user) => {
                                 setLoading(true);
                                 setError('');
                                 try {
