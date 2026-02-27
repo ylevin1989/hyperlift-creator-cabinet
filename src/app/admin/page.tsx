@@ -489,7 +489,7 @@ export default function AdminPage() {
                                                                             <span className="flex items-center gap-0.5"><Eye size={10} /> {formatNumber(asset.views)}</span>
                                                                             <span className="flex items-center gap-0.5"><ThumbsUp size={10} /> {formatNumber(asset.likes)}</span>
                                                                             <span className="flex items-center gap-0.5"><MessageCircle size={10} /> {formatNumber(asset.comments)}</span>
-                                                                            {asset.kpi_bonus > 0 && <span className="text-green-400 font-bold">+{asset.kpi_bonus}₽</span>}
+                                                                            {asset.kpi_bonus > 0 && <span className="text-green-400 font-bold">+{Math.floor(asset.kpi_bonus)}₽</span>}
                                                                         </div>
                                                                     </div>
 

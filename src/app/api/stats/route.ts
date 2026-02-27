@@ -50,14 +50,14 @@ export async function GET(request: Request) {
         // Add matching KPIs to available balance
         let totalKpi = 0;
         videos?.forEach(v => {
-            const kpiBonus = parseFloat(v.kpi_bonus) || 0;
+            const kpiBonus = Math.floor(parseFloat(v.kpi_bonus) || 0);
             calcAvailable += kpiBonus;
             totalKpi += kpiBonus;
         });
 
         if (profile) {
-            profile.available_balance = calcAvailable;
-            profile.holding_balance = calcHolding;
+            profile.available_balance = Math.floor(calcAvailable);
+            profile.holding_balance = Math.floor(calcHolding);
         }
 
         // Calculate aggregated metrics dynamically

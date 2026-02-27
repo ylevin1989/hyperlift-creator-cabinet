@@ -74,7 +74,7 @@ export async function GET(request: Request) {
             const projTitle = proj ? (Array.isArray(proj) ? proj[0]?.title : proj.title) : undefined;
             const dateObj = new Date(v.created_at);
             
-            const kpiBonus = parseFloat(v.kpi_bonus) || 0;
+            const kpiBonus = Math.floor(parseFloat(v.kpi_bonus) || 0);
             calcAvailable += kpiBonus;
 
             transactions.push({
@@ -98,8 +98,8 @@ export async function GET(request: Request) {
         transactions.forEach(t => { delete t._rawDate; });
 
         if (profile) {
-            profile.available_balance = calcAvailable;
-            profile.holding_balance = calcHolding;
+            profile.available_balance = Math.floor(calcAvailable);
+            profile.holding_balance = Math.floor(calcHolding);
         }
 
         return NextResponse.json({

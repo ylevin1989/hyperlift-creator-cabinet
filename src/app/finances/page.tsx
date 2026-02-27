@@ -81,7 +81,7 @@ export default function FinancesPage() {
                     <h3 className="text-blue-200 font-medium flex items-center gap-2">
                         Доступно к выводу <CheckCircle2 size={16} />
                     </h3>
-                    <p className="text-4xl font-black text-white mt-2 mb-6">{data.profile.available_balance} ₽</p>
+                    <p className="text-4xl font-black text-white mt-2 mb-6">{Math.floor(data.profile.available_balance)} ₽</p>
                     <button className="bg-white text-black font-bold py-3 px-6 rounded-xl hover:bg-neutral-200 transition-colors shadow-lg relative z-10">
                         Вывести средства
                     </button>

@@ -107,9 +107,9 @@ export default function DashboardPage() {
                             <Wallet size={120} />
                         </div>
                         <h3 className="text-blue-200 font-medium text-sm">Доступно</h3>
-                        <p className="text-3xl font-black text-white mt-1">{stats.profile?.available_balance || 0} ₽</p>
+                        <p className="text-3xl font-black text-white mt-1">{Math.floor(stats.profile?.available_balance || 0)} ₽</p>
                         {stats.metrics?.totalKpi > 0 && (
-                            <p className="text-xs text-blue-200 mt-1">Из них по KPI: +{stats.metrics.totalKpi} ₽</p>
+                            <p className="text-xs text-blue-200 mt-1">Из них по KPI: +{Math.floor(stats.metrics.totalKpi)} ₽</p>
                         )}
                     </div>
 
