@@ -74,16 +74,22 @@ export async function GET(request: Request) {
 
         if (error) throw error;
 
-        // Attach KPI configs for this creator
+        // Attach KPI configs for this creator from cr_project_creators
         const { data: kpis } = await supabase
-            .from('cr_kpi_configs')
-            .select('*')
+            .from('cr_project_creators')
+            .select('project_id, kpi_metric, kpi_rate, kpi_target')
             .eq('creator_id', userId)
             .in('project_id', allIds);
 
         const projectsWithKpi = (projects || []).map(p => ({
             ...p,
-            kpi_configs: (kpis || []).filter(k => k.project_id === p.id)
+            kpi_configs: (kpis || []).filter(k => k.project_id === p.id).map(k => ({
+                project_id: k.project_id,
+                creator_id: userId,
+                metric: k.kpi_metric,
+                rate: k.kpi_rate,
+                target: k.kpi_target
+            }))
         }));
 
         return NextResponse.json({ projects: projectsWithKpi });

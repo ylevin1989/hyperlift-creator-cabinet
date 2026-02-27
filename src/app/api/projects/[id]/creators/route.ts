@@ -24,18 +24,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
         if (aErr) throw aErr;
 
-        // Get KPI configs for this project
-        const { data: kpis, error: kErr } = await supabase
-            .from('cr_kpi_configs')
-            .select('*')
-            .eq('project_id', projectId);
-
-        if (kErr) throw kErr;
-
-        // Merge KPIs into assignments
+        // KPI configs are already in cr_project_creators (kpi_metric, kpi_rate, kpi_target)
         const result = (assignments || []).map(a => ({
             ...a,
-            kpi_configs: (kpis || []).filter(k => k.creator_id === a.creator_id)
+            kpi_configs: a.kpi_metric ? [{
+                project_id: projectId,
+                creator_id: a.creator_id,
+                metric: a.kpi_metric,
+                rate: a.kpi_rate,
+                target: a.kpi_target
+            }] : []
         }));
 
         return NextResponse.json({ creators: result });
