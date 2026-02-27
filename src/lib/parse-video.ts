@@ -24,6 +24,16 @@ export async function parseVideoMetrics(url: string): Promise<VideoMetrics> {
             result = await parseTikTok(url);
         } else if (url.includes('instagram.com')) {
             result = await parseInstagram(url);
+        } else if (url.includes('vk.com') || url.includes('vkvideo.ru')) {
+            result = await parseVK(url);
+        } else if (url.includes('threads.net')) {
+            result = await parseThreads(url);
+        } else if (url.includes('t.me')) {
+            result = await parseTelegram(url);
+        } else if (url.includes('likee.video')) {
+            result = await parseLikee(url);
+        } else if (url.includes('max.ru') || url.includes('maks.su')) {
+            result = await parseMAX(url);
         }
         
         // Ensure no NaN values
@@ -261,76 +271,281 @@ async function parseTikTok(url: string): Promise<VideoMetrics> {
 async function parseInstagram(url: string): Promise<VideoMetrics> {
     let title = '', views = 0, likes = 0, comments = 0, thumbnail_url = '';
 
-    const apifyToken = process.env.APIFY_TOKEN;
-    if (!apifyToken) {
-        console.warn('[IG Parser] APIFY_TOKEN is missing. Returning zeros.');
+    try {
+        console.log('[IG Parser] Using Apify...');
+        const data = await runApifyActor('shu8hvrXbJbY3Eb9W', {
+            directUrls: [url],
+            resultsLimit: 1
+        });
+
+        if (!data || data.length === 0) {
+            console.warn('[IG Apify] No data returned');
+            return { title, views, likes, comments, thumbnail_url };
+        }
+
+        const media = data[0];
+        
+        likes = media.likesCount || 0;
+        comments = media.commentsCount || 0;
+        views = media.videoViewCount || media.videoPlayCount || 0;
+        
+        const raw_thumb = media.displayUrl || media.thumbnailUrl || '';
+        if (raw_thumb) {
+            thumbnail_url = `https://wsrv.nl/?url=${encodeURIComponent(raw_thumb)}`;
+        }
+        
+        if (media.caption) {
+            title = media.caption.length > 60 ? media.caption.substring(0, 60) + '...' : media.caption;
+        }
+
+    } catch (e: any) {
+        console.error('[IG Parser] Apify error:', e?.message || e);
+    }
+
+    return { title, views, likes, comments, thumbnail_url };
+}
+
+// ─── VK ─────────────────────────────────────────────────────────────────────
+async function parseVK(url: string): Promise<VideoMetrics> {
+    let title = '', views = 0, likes = 0, comments = 0, thumbnail_url = '';
+    try {
+        console.log('[VK Parser] Using Apify...');
+        const data = await runApifyActor('jupri/vkontakte', {
+            query: [url],
+            limit: 1
+        });
+
+        if (data && data.length > 0) {
+            const item = data[0];
+            likes = (typeof item.likes === 'object' ? item.likes?.count : item.likes) || 0;
+            views = item.views || 0;
+            comments = item.comments || 0;
+            title = item.text || item.title || '';
+            if (title.length > 60) title = title.substring(0, 60) + '...';
+            
+            // Handle complex image object in VK response
+            let thumb = '';
+            if (typeof item.image === 'string') thumb = item.image;
+            else if (Array.isArray(item.image)) thumb = item.image[item.image.length - 1]?.url || '';
+            else if (typeof item.image === 'object') thumb = item.image.url || '';
+            
+            if (!thumb && item.thumbnail) thumb = item.thumbnail;
+            
+            if (thumb) thumbnail_url = `https://wsrv.nl/?url=${encodeURIComponent(thumb)}`;
+        }
+    } catch (e: any) {
+        console.error('[VK Parser] error:', e?.message);
+    }
+    return { title, views, likes, comments, thumbnail_url };
+}
+
+// ─── MAX Messenger (Official API) ──────────────────────────────────────────
+async function parseMAX(url: string): Promise<VideoMetrics> {
+    let title = '', views = 0, likes = 0, comments = 0, thumbnail_url = '';
+    const botToken = process.env.MAX_BOT_TOKEN;
+    
+    if (!botToken) {
+        console.warn('[MAX Parser] MAX_BOT_TOKEN missing, cannot use official API');
         return { title, views, likes, comments, thumbnail_url };
     }
 
     try {
-        console.log('[IG Parser] Using Apify (strictly)...');
-        // We can just pass the URL directly to Apify
-        const apifyUrl = `https://api.apify.com/v2/acts/shu8hvrXbJbY3Eb9W/run-sync-get-dataset-items?token=${apifyToken}`;
+        console.log('[MAX Parser] Using Official API...');
+        // Example URL: https://max.ru/c/CHANNEL_ID/MESSAGE_ID
+        // We need to extract message ID. This is a heuristic as public URLs are not standardized for bots.
+        const messageIdMatch = url.match(/\/(\d+)$/);
+        if (!messageIdMatch) return { title, views, likes, comments, thumbnail_url };
+        
+        const messageId = messageIdMatch[1];
+        const apiUrl = `https://platform-api.max.ru/messages/${messageId}?access_token=${botToken}`;
+        
+        const res = await fetch(apiUrl);
+        
+        if (res.ok) {
+            const data = await res.json();
+            // Based on dev.max.ru/docs-api
+            if (data.message) {
+                title = data.message.text || '';
+                if (title.length > 60) title = title.substring(0, 60) + '...';
+                views = data.message.stat?.views || 0;
+                // Reactions might require additional processing or aren't in this endpoint
+            }
+        }
+    } catch (e: any) {
+        console.error('[MAX Parser] error:', e?.message);
+    }
+    return { title, views, likes, comments, thumbnail_url };
+}
 
+// ─── Threads ────────────────────────────────────────────────────────────────
+async function parseThreads(url: string): Promise<VideoMetrics> {
+    let title = '', views = 0, likes = 0, comments = 0, thumbnail_url = '';
+    try {
+        console.log('[Threads Parser] Using Apify (futurizerush/meta-threads-scraper)...');
+        // Extract username from URL like threads.net/@zuck/post/...
+        const usernameMatch = url.match(/threads\.(?:net|com)\/@([A-Za-z0-9_.-]+)/);
+        const username = usernameMatch ? usernameMatch[1] : '';
+        if (!username) {
+            console.warn('[Threads Parser] Could not extract username from URL');
+            return { title, views, likes, comments, thumbnail_url };
+        }
+        
+        // futurizerush/meta-threads-scraper — PAY_PER_EVENT (no subscription)
+        // Output: { like_count, comment_count, view_count, text_content, followers_count, profile_pic_url }
+        const data = await runApifyActor('futurizerush/meta-threads-scraper', {
+            mode: 'user',
+            usernames: [username],
+            max_posts: 10 // Minimum allowed by this actor
+        });
+
+        if (data && data.length > 0) {
+            const item = data[0];
+            likes = item.like_count || 0;
+            comments = item.comment_count || 0;
+            views = item.view_count || 0;
+            title = item.text_content || '';
+            if (title.length > 60) title = title.substring(0, 60) + '...';
+            
+            const thumb = item.profile_pic_url || '';
+            if (thumb) thumbnail_url = `https://wsrv.nl/?url=${encodeURIComponent(thumb)}`;
+        }
+    } catch (e: any) {
+        console.error('[Threads Parser] error:', e?.message);
+    }
+    return { title, views, likes, comments, thumbnail_url };
+}
+
+// ─── Telegram ───────────────────────────────────────────────────────────────
+async function parseTelegram(url: string): Promise<VideoMetrics> {
+    let title = '', views = 0, likes = 0, comments = 0, thumbnail_url = '';
+    try {
+        console.log('[Telegram Parser] Using Apify (pamnard/telegram-channels-scraper)...');
+        // Extract channel username from t.me/durov or t.me/durov/123
+        const channelMatch = url.match(/t\.me\/([A-Za-z0-9_]+)/);
+        const channel = channelMatch ? channelMatch[1] : '';
+        if (!channel) {
+            console.warn('[Telegram Parser] Could not extract channel from URL');
+            return { title, views, likes, comments, thumbnail_url };
+        }
+
+        // pamnard/telegram-channels-scraper — verified working actor
+        // Input: { channels: [{url: "..." }], messages_limit: 1 }
+        // Output: { subscribers, messages: [{ id, date, text, views, author }] }
+        const data = await runApifyActor('pamnard/telegram-channels-scraper', {
+            channels: [{ url: url }],
+            messages_limit: 1
+        });
+
+        if (data && data.length > 0) {
+            const item = data[0];
+            // Get the latest message
+            const msg = item.messages?.[0];
+            if (msg) {
+                const rawViews = msg.views || '0';
+                views = typeof rawViews === 'string' ? parseHumanNumber(rawViews) : rawViews;
+                title = msg.text || '';
+                if (title.length > 60) title = title.substring(0, 60) + '...';
+            }
+            // Channel avatar as thumbnail
+            if (item.avatar_url) {
+                thumbnail_url = `https://wsrv.nl/?url=${encodeURIComponent(item.avatar_url)}`;
+            }
+        }
+    } catch (e: any) {
+        console.error('[Telegram Parser] error:', e?.message);
+    }
+    return { title, views, likes, comments, thumbnail_url };
+}
+
+// ─── Likee ──────────────────────────────────────────────────────────────────
+async function parseLikee(url: string): Promise<VideoMetrics> {
+    let title = '', views = 0, likes = 0, comments = 0, thumbnail_url = '';
+    try {
+        console.log('[Likee Parser] Using Apify (sasha24tiy/likee-scraper)...');
+        const data = await runApifyActor('sasha24tiy/likee-scraper', {
+            urls: [url],
+            maxItems: 1
+        });
+
+        if (data && data.length > 0) {
+            const item = data[0];
+            likes = item.likeCount || 0;
+            views = item.viewCount || 0;
+            comments = item.commentCount || 0;
+            title = item.caption || '';
+            if (title.length > 60) title = title.substring(0, 60) + '...';
+            
+            const thumb = item.coverUrl || '';
+            if (thumb) thumbnail_url = `https://wsrv.nl/?url=${encodeURIComponent(thumb)}`;
+        }
+    } catch (e: any) {
+        console.error('[Likee Parser] error:', e?.message);
+    }
+    return { title, views, likes, comments, thumbnail_url };
+}
+
+// ─── Apify Helper with Token Rotation ───────────────────────────────────────
+// Tracks which token index to start with (persists across calls within same process)
+let lastWorkingTokenIndex = 0;
+
+function getApifyTokens(): string[] {
+    // APIFY_TOKENS is comma-separated list; fallback to single APIFY_TOKEN
+    const tokensStr = process.env.APIFY_TOKENS || process.env.APIFY_TOKEN || '';
+    const tokens = tokensStr.split(',').map(t => t.trim()).filter(Boolean);
+    if (tokens.length === 0) throw new Error('APIFY_TOKEN / APIFY_TOKENS is missing');
+    return tokens;
+}
+
+async function runApifyActor(actorId: string, input: any): Promise<any[]> {
+    const tokens = getApifyTokens();
+    const normalizedActorId = actorId.replace('/', '~');
+    
+    // Start from last working token to avoid wasting requests on depleted ones
+    for (let attempt = 0; attempt < tokens.length; attempt++) {
+        const tokenIdx = (lastWorkingTokenIndex + attempt) % tokens.length;
+        const token = tokens[tokenIdx];
+        const apifyUrl = `https://api.apify.com/v2/acts/${normalizedActorId}/run-sync-get-dataset-items?token=${token}`;
         const controller = new AbortController();
-        // Give Apify up to 30 seconds since it spins up a headless browser
-        const timeout = setTimeout(() => controller.abort(), 30000);
+        const timeout = setTimeout(() => controller.abort(), 120000); // 120s for actors with browser rendering
 
         try {
             const res = await fetch(apifyUrl, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    directUrls: [url],
-                    resultsLimit: 1
-                }),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(input),
                 signal: controller.signal,
             });
 
+            if (res.status === 402) {
+                const errBody = await res.text();
+                console.warn(`[Apify] Token #${tokenIdx + 1} limit exceeded, trying next...`);
+                clearTimeout(timeout);
+                // Move to next token for future calls
+                lastWorkingTokenIndex = (tokenIdx + 1) % tokens.length;
+                continue; // Try next token
+            }
+
             if (!res.ok) {
                 const errBody = await res.text();
-                console.error(`[IG Apify] HTTP ${res.status}: ${errBody}`);
-                return { title, views, likes, comments, thumbnail_url };
+                clearTimeout(timeout);
+                throw new Error(`Apify HTTP ${res.status}: ${errBody}`);
             }
 
+            // Success — remember this working token
+            lastWorkingTokenIndex = tokenIdx;
             const data = await res.json();
-
-            if (!Array.isArray(data) || data.length === 0) {
-                console.warn('[IG Apify] Empty dataset returned');
-                return { title, views, likes, comments, thumbnail_url };
-            }
-
-            const media = data[0];
-            
-            likes = media.likesCount || 0;
-            comments = media.commentsCount || 0;
-            views = media.videoViewCount || media.videoPlayCount || 0;
-            
-            const raw_thumb = media.displayUrl || media.thumbnailUrl || '';
-            if (raw_thumb) {
-                // Use a proxy (wsrv.nl) to avoid Instagram CORS block and broken images on the frontend
-                thumbnail_url = `https://wsrv.nl/?url=${encodeURIComponent(raw_thumb)}`;
-            }
-            
-            if (media.caption) {
-                title = media.caption.length > 60 ? media.caption.substring(0, 60) + '...' : media.caption;
-            }
-
-        } finally {
             clearTimeout(timeout);
-        }
-    } catch (e: unknown) {
-        const err = e as { name?: string; message?: string };
-        if (err.name === 'AbortError') {
-            console.error('[IG Parser] Apify request timed out (>30s)');
-        } else {
-            console.error('[IG Parser] Apify failed:', err.message || e);
+            return data;
+        } catch (e: any) {
+            clearTimeout(timeout);
+            if (e.message?.includes('limit exceeded') || e.message?.includes('402')) {
+                continue; // Try next token
+            }
+            throw e;
         }
     }
-
-    return { title, views, likes, comments, thumbnail_url };
+    
+    throw new Error('All Apify tokens exhausted (402 on all tokens)');
 }
 
 // ─── Follower / Subscriber Count Parser ─────────────────────────────────────
@@ -348,6 +563,21 @@ export async function parseFollowerCount(url: string): Promise<number> {
         }
         if (url.includes('instagram.com')) {
             return await getInstagramFollowers(url);
+        }
+        if (url.includes('vk.com')) {
+            return await getVKFollowers(url);
+        }
+        if (url.includes('threads.net')) {
+            return await getThreadsFollowers(url);
+        }
+        if (url.includes('t.me')) {
+            return await getTelegramFollowers(url);
+        }
+        if (url.includes('likee.video')) {
+            return await getLikeeFollowers(url);
+        }
+        if (url.includes('max.ru') || url.includes('maks.su')) {
+            return await getMAXFollowers(url);
         }
     } catch (e: any) {
         console.error('parseFollowerCount error:', e?.message || e);
@@ -464,6 +694,133 @@ async function getInstagramFollowers(url: string): Promise<number> {
         } catch (e: any) {
             console.error('[IG Followers] RapidAPI error:', e?.message);
         }
+    }
+    return 0;
+}
+
+// VK: Official API (for followers/members) or Apify
+async function getVKFollowers(url: string): Promise<number> {
+    const serviceToken = process.env.VK_SERVICE_TOKEN;
+    if (serviceToken) {
+        try {
+            console.log('[VK Followers] Using Official API...');
+            // Extract profile/group ID/screen_name
+            const match = url.match(/vk\.com\/([A-Za-z0-9_.-]+)/);
+            if (match) {
+                const id = match[1];
+                // Try Groups first (more common for bloggers)
+                const groupRes = await fetch(`https://api.vk.com/method/groups.getById?group_id=${id}&fields=members_count&access_token=${serviceToken}&v=5.131`);
+                const groupData = await groupRes.json();
+                if (groupData?.response?.[0]?.members_count) {
+                    return groupData.response[0].members_count;
+                }
+                
+                // Try User if group failed
+                const userRes = await fetch(`https://api.vk.com/method/users.get?user_ids=${id}&fields=followers_count&access_token=${serviceToken}&v=5.131`);
+                const userData = await userRes.json();
+                if (userData?.response?.[0]?.followers_count) {
+                    return userData.response[0].followers_count;
+                }
+            }
+        } catch (e: any) {
+            console.error('[VK Followers] Official API error:', e?.message);
+        }
+    }
+
+    try {
+        console.log('[VK Followers] Using Apify fallback...');
+        const data = await runApifyActor('jupri/vkontakte', {
+            query: [url],
+            limit: 1
+        });
+        if (data && data.length > 0) {
+            const item = data[0];
+            return item.members_count || item.followers_count || item.subscribers_count || 0;
+        }
+    } catch (e: any) {
+        console.error('[VK Followers] error:', e?.message);
+    }
+    return 0;
+}
+
+// MAX: Official API
+async function getMAXFollowers(url: string): Promise<number> {
+    const botToken = process.env.MAX_BOT_TOKEN;
+    if (!botToken) return 0;
+
+    try {
+        console.log('[MAX Followers] Using Official API...');
+        const match = url.match(/max\.ru\/([A-Za-z0-9_.-]+)/) || url.match(/maks\.su\/([A-Za-z0-9_.-]+)/);
+        if (match) {
+            const chatId = match[1];
+            const res = await fetch(`https://platform-api.max.ru/chats/${chatId}?access_token=${botToken}`);
+            if (res.ok) {
+                const data = await res.json();
+                return data.participants_count || data.subscribers_count || 0;
+            }
+        }
+    } catch (e: any) {
+        console.error('[MAX Followers] error:', e?.message);
+    }
+    return 0;
+}
+
+// Threads: Apify (futurizerush/meta-threads-scraper — returns followers_count in each post record)
+async function getThreadsFollowers(url: string): Promise<number> {
+    try {
+        const usernameMatch = url.match(/threads\.(?:net|com)\/@([A-Za-z0-9_.-]+)/);
+        const username = usernameMatch ? usernameMatch[1] : '';
+        if (!username) return 0;
+        
+        const data = await runApifyActor('futurizerush/meta-threads-scraper', {
+            mode: 'user',
+            usernames: [username],
+            max_posts: 10 // Minimum allowed by this actor
+        });
+        if (data && data.length > 0) {
+            const item = data[0];
+            return item.followers_count || item.follower_count || 0;
+        }
+    } catch (e: any) {
+        console.error('[Threads Followers] error:', e?.message);
+    }
+    return 0;
+}
+
+// Telegram: Apify (pamnard/telegram-channels-scraper — returns subscribers count)
+async function getTelegramFollowers(url: string): Promise<number> {
+    try {
+        const channelMatch = url.match(/t\.me\/([A-Za-z0-9_]+)/);
+        const channel = channelMatch ? channelMatch[1] : '';
+        if (!channel) return 0;
+
+        const data = await runApifyActor('pamnard/telegram-channels-scraper', {
+            channels: [{ url: url }],
+            messages_limit: 0 // Only channel info, skip messages
+        });
+        if (data && data.length > 0) {
+            const item = data[0];
+            return item.subscribers || item.subscribersCount || item.membersCount || 0;
+        }
+    } catch (e: any) {
+        console.error('[Telegram Followers] error:', e?.message);
+    }
+    return 0;
+}
+
+// Likee: Apify
+async function getLikeeFollowers(url: string): Promise<number> {
+    try {
+        const data = await runApifyActor('sasha24tiy/likee-scraper', {
+            urls: [url],
+            maxItems: 1
+        });
+        if (data && data.length > 0) {
+            const item = data[0];
+            return item.followerCount || item.fansCount || item.follower_count || 0;
+        }
+    } catch (e: any) {
+        console.error('[Likee Followers] error:', e?.message);
     }
     return 0;
 }
